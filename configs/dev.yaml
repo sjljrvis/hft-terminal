@@ -1,0 +1,5 @@
+# Development environment configuration
+
+mode: live
+api_port: 5001
+web_port: 5002

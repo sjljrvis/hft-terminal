@@ -1,0 +1,273 @@
+//@version=6
+// 72% win rate  6:1 risk reward ratio
+strategy("index-scalp-1min",overlay=true)
+
+analyze= input.bool(title = "Analyze trades", defval = true)
+Multiplier = input.float( title = 'Multiplier', defval = 1) // 2.5
+CCI = input.int(14,title = "CCI") // 21, 25 optimal // 10
+ATR = input.int(1,title = "ATR") // 5
+session_slot = input.string('0920-1520', title = 'Time session', options = [
+    // '0920-1000',
+    // '1000-1030',
+    // '1030-1100',
+    // '1100-1130',
+    // '1130-1200',
+    // '1200-1230',
+    // '1230-1300',
+    // '1300-1330',
+    // '1330-1400',
+    // '1400-1430',
+    // '1430-1500'
+
+    '0920-1000',
+    '1000-1100',
+    '1100-1200',
+    '1200-1300',
+    '1300-1400',
+    '1400-1500',
+    '0920-1520'
+    // '1150-1520'
+
+])
+_x_smooth_len = input.int(5, title = "_x_ smoothing length", minval = 1)
+htg= input.bool(title = "Hide trend graph", defval = false)
+isActiveSession = false or not na(time(timeframe.period, session_slot))
+capture_points = input.int( 100, title = "Capture points", minval = 1)
+stop_loss_points = input.int( 60, title = "Stop loss points", minval = 1)
+
+// ========== TRAILING STOP-LOSS SETTINGS ==========
+use_trailing_stop = input.bool(title = "Use Trailing Stop", defval = true, group = "Trailing Stop")
+trail_activation_points = input.int(10, title = "Trail Activation (points)", minval = 1, group = "Trailing Stop", tooltip = "Start trailing after this profit")
+trail_distance_points = input.int(10, title = "Trail Distance (points)", minval = 1, group = "Trailing Stop", tooltip = "Distance to maintain from highest profit")
+use_atr_trailing = input.bool(title = "Use ATR-based Trailing", defval = true, group = "Trailing Stop")
+atr_trailing_multiplier = input.float(0.0, title = "ATR Trailing Multiplier", minval = 0.0, group = "Trailing Stop")
+use_breakeven = input.bool(title = "Move to Breakeven", defval = true, group = "Trailing Stop")
+breakeven_activation_points = input.int(5, title = "Breakeven Activation (points)", minval = 1, group = "Trailing Stop", tooltip = "Move stop to breakeven after this profit")
+
+COLOR_GREEN = color.rgb(0, 255, 8)
+COLOR_PINK = #e032ff
+COLOR_YELLOW = color.yellow
+
+var CURRENT_TRADE_ENTRY = 0.0
+var CURRENT_TRADE_KIND = 'NA'
+
+// ========== TRAILING STOP VARIABLES ==========
+var float highest_profit_long = 0.0
+var float highest_profit_short = 0.0
+var float trailing_stop_long = 0.0
+var float trailing_stop_short = 0.0
+var bool breakeven_activated_long = false
+var bool breakeven_activated_short = false
+
+_vwap = ta.vwap(ohlc4)
+
+ema200 = ta.ema(close, 200)
+ema400 = ta.ema(close,400)
+
+fast_cci = ta.cci(ta.ema(ohlc4, 2), 2)
+slow_cci = ta.cci(ta.ema(ohlc4, 2), 14)
+
+calcx(source, param, atr, cci)=>
+    lastCCI = nz(cci[1])
+    mul =  param * 1
+
+    bufferDn=  source  + param * ta.wma(ta.tr,atr)
+    bufferUp= source - param * ta.wma(ta.tr,atr)
+
+    if (cci >= 0 and lastCCI < 0) 
+        bufferUp := bufferDn[1]
+    if (cci <= 0 and lastCCI > 0) 
+        bufferDn := bufferUp[1]
+
+    if (cci >= 0)
+        avgUp = bufferUp[1]
+        if (bufferUp < avgUp)
+            bufferUp := avgUp //- ta.tr[1]
+    else
+        if (cci <= 0)
+            avgDn = bufferDn[1]
+            if (bufferDn > avgDn)
+                bufferDn := avgDn //+ ta.tr[1]
+
+    x = 0.0
+    x := cci >= 0 ? bufferUp : cci <= 0 ? bufferDn : x[1]
+    x
+
+
+tempx = calcx( close , 2, 2, fast_cci) // 0.5
+tempx_base = calcx( close , 0.1, 400, slow_cci) // 2.5
+
+_ema_200_ = ema200
+_close_ema200_diff = math.abs(close - _ema_200_)
+_close_ema200_percent = (_close_ema200_diff/close) * 100
+
+emaBuff =   (0.1/100)*ema200
+emaBuffFar = (2.8/100)*ema200
+
+// _x_raw =  ((( 0 * ta.ema(ohlc4,200)) + (  100* tempx)) /100)
+// _x_ = _x_raw
+
+_x_ = ta.ema(tempx, 5) //ta.ema(_x_raw, _x_smooth_len)
+
+_x_base =  ta.ema(tempx_base,2)
+
+open_strategy_profit () => 
+    p = 0.0
+    if CURRENT_TRADE_KIND == 'LONG'
+        p := ((close - CURRENT_TRADE_ENTRY)/CURRENT_TRADE_ENTRY) * 100
+    else if CURRENT_TRADE_KIND == 'SHORT'
+        p := ((CURRENT_TRADE_ENTRY - close)/CURRENT_TRADE_ENTRY) * 100
+    p 
+
+check_atr_expansion = false or nz(ta.atr(3)) + math.abs(close[2]- close[0])  > nz(ta.atr(10))
+
+calcswap(param, deep) =>
+    swap = 0.0
+    direction = 'na'
+    _pr = 0.0
+    _pr_1 = 0.0
+
+
+    float avg_param = ta.sma(param, 30)
+
+    swap := param > avg_param and check_atr_expansion ? 1 : param < avg_param and check_atr_expansion ? -1 : swap[1]
+        
+    _pr := math.round((param*1000))/1000
+    _pr_1 :=  math.round((param[1]*1000))/1000
+    _atr_ema = ta.sma(ta.atr(5), 10)
+    // _atr_ema = ta.atr(2)
+    if(math.abs(_pr - _pr_1[1]) < _atr_ema)
+        swap := swap[1]
+    if(not isActiveSession)
+        swap := 0
+    swap
+
+
+
+calcswap_(param) =>
+    swap = 0.0
+    swap := param > param[1]  ? 1 : param < param[1]  ? -1 : swap[1]
+    swap
+
+tempswap = calcswap(_x_, false)
+tempswap_base = calcswap(_x_base, false)
+
+var color swap2 = COLOR_YELLOW
+var color swap_base = COLOR_YELLOW
+
+swap2 := tempswap == 1 ? COLOR_GREEN : tempswap == -1 ? COLOR_PINK : COLOR_YELLOW
+swap_base := tempswap_base == 1 ? COLOR_GREEN : tempswap_base == -1 ? COLOR_PINK : COLOR_YELLOW
+
+buy =  swap_base == COLOR_GREEN and swap2 == swap_base
+sell =  swap_base == COLOR_PINK and swap2 == swap_base
+
+//buy =   (swap2[1] == (COLOR_YELLOW))  and swap2 == COLOR_GREEN
+//sell = (swap2[1] == (COLOR_YELLOW)) and swap2 == COLOR_PINK
+
+
+plot(ema200, color = color.black, linewidth=1, title= "ema200")
+
+plot(htg ? na: _x_, color=swap2, linewidth=3, title = "tempx")
+plot(htg ? na: _x_base + 50, color=swap_base,linewidth=3, title = "baseswap")
+
+// plotshape( buy ? 1 : na , style = shape.triangleup , color = color.black , location = location.belowbar , size = size.small )
+// plotshape( sell ? 1 : na , style = shape.triangledown , color = color.black , location = location.abovebar , size = size.small)
+currentTradePnL = strategy.position_size != 0 ? (close - strategy.position_avg_price) * strategy.position_size : 0
+_current_captured_points = currentTradePnL
+
+// ========== TRAILING STOP-LOSS LOGIC ==========
+// Calculate current profit for LONG position
+current_profit_long = strategy.position_size > 0 ? (close - strategy.position_avg_price) : 0.0
+// Calculate current profit for SHORT position  
+current_profit_short = strategy.position_size < 0 ? (strategy.position_avg_price - close) : 0.0
+
+// Update highest profit for LONG positions
+if strategy.position_size > 0
+    if current_profit_long > highest_profit_long
+        highest_profit_long := current_profit_long
+    // Calculate trailing stop distance
+    trail_dist = use_atr_trailing ? ta.atr(14) * atr_trailing_multiplier : trail_distance_points
+    // Activate trailing stop after reaching activation threshold
+    if use_trailing_stop and highest_profit_long >= trail_activation_points
+        new_trailing_stop = close - trail_dist
+        if new_trailing_stop > trailing_stop_long or trailing_stop_long == 0
+            trailing_stop_long := new_trailing_stop
+    // Move to breakeven
+    if use_breakeven and not breakeven_activated_long and highest_profit_long >= breakeven_activation_points
+        trailing_stop_long := CURRENT_TRADE_ENTRY
+        breakeven_activated_long := true
+else
+    // Reset when no position
+    highest_profit_long := 0.0
+    trailing_stop_long := 0.0
+    breakeven_activated_long := false
+
+// Update highest profit for SHORT positions
+if strategy.position_size < 0
+    if current_profit_short > highest_profit_short
+        highest_profit_short := current_profit_short
+    // Calculate trailing stop distance
+    trail_dist = use_atr_trailing ? ta.atr(14) * atr_trailing_multiplier : trail_distance_points
+    // Activate trailing stop after reaching activation threshold
+    if use_trailing_stop and highest_profit_short >= trail_activation_points
+        new_trailing_stop = close + trail_dist
+        if new_trailing_stop < trailing_stop_short or trailing_stop_short == 0
+            trailing_stop_short := new_trailing_stop
+    // Move to breakeven
+    if use_breakeven and not breakeven_activated_short and highest_profit_short >= breakeven_activation_points
+        trailing_stop_short := CURRENT_TRADE_ENTRY
+        breakeven_activated_short := true
+else
+    // Reset when no position
+    highest_profit_short := 0.0
+    trailing_stop_short := 0.0
+    breakeven_activated_short := false
+
+// Check trailing stop hits
+trailing_stop_hit_long = use_trailing_stop and strategy.position_size > 0 and trailing_stop_long > 0 and close <= trailing_stop_long
+trailing_stop_hit_short = use_trailing_stop and strategy.position_size < 0 and trailing_stop_short > 0 and close >= trailing_stop_short
+
+// Plot trailing stops (optional visualization)
+//plot(strategy.position_size > 0 and trailing_stop_long > 0 ? trailing_stop_long : na, "Trailing Stop Long", color.red, 5, plot.style_linebr)
+//plot(strategy.position_size < 0 and trailing_stop_short > 0 ? trailing_stop_short : na, "Trailing Stop Short", color.red, 5, plot.style_linebr)
+
+// ========== EXIT CONDITIONS ==========
+profit_hit = _current_captured_points >= capture_points
+stop_hit = _current_captured_points <= -stop_loss_points
+time_exit = hour == 15 and minute == 20
+
+should_close_sell = CURRENT_TRADE_KIND == 'SHORT' and (profit_hit or stop_hit or trailing_stop_hit_short  )
+should_close_buy  = CURRENT_TRADE_KIND == 'LONG'  and (profit_hit or stop_hit or trailing_stop_hit_long  )
+
+if(should_close_sell)
+    CURRENT_TRADE_ENTRY := 0
+    CURRENT_TRADE_KIND := 'NA'
+    highest_profit_short := 0.0
+    trailing_stop_short := 0.0
+    breakeven_activated_short := false
+    strategy.close("sell")
+    
+if(should_close_buy)
+    CURRENT_TRADE_ENTRY := 0
+    CURRENT_TRADE_KIND := 'NA'
+    highest_profit_long := 0.0
+    trailing_stop_long := 0.0
+    breakeven_activated_long := false
+    strategy.close("buy")
+
+if(analyze and sell  and check_atr_expansion)  //and close < _ema_200_)
+    CURRENT_TRADE_KIND := "SHORT"
+    CURRENT_TRADE_ENTRY := close
+    highest_profit_short := 0.0
+    trailing_stop_short := 0.0
+    breakeven_activated_short := false
+    strategy.entry("sell",strategy.short)
+
+if(analyze and  buy and check_atr_expansion ) //and close > _ema_200_ )
+
+    CURRENT_TRADE_KIND := "LONG"
+    CURRENT_TRADE_ENTRY := close
+    highest_profit_long := 0.0
+    trailing_stop_long := 0.0
+    breakeven_activated_long := false
+    strategy.entry("buy",strategy.long)
