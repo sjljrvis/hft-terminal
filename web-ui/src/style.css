@@ -499,6 +499,26 @@ button {
   font-family: inherit;
   font-size: 10px;
 }
+.trades-drawer__download {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.6;
+  font-weight: 200;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trades-drawer__download:hover {
+  background: var(--border-color);
+}
 
 .trades-drawer__search input {
   background: transparent;
@@ -615,6 +635,81 @@ button {
 .trade-side.sell {
   text-transform: uppercase;
   color: #ef4444;
+}
+
+.trade-type {
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.trade-type.buy {
+  color: #22c55e;
+}
+
+.trade-type.sell {
+  color: #ef4444;
+}
+
+.profit-positive {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.profit-negative {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.profit-pct {
+  font-size: 10px;
+  color: var(--muted-color);
+  font-weight: normal;
+}
+
+.reason-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-profit {
+  background: rgba(22, 163, 74, 0.15);
+  color: #16a34a;
+}
+
+.badge-loss {
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+}
+
+.badge-trail {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.badge-signal {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.trades-drawer__footer .metric-value.negative {
+  color: #dc2626;
+}
+
+.metric-breakdown {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.metric-breakdown span {
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 9px;
 }
 
 .sidebar {

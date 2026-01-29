@@ -57,15 +57,13 @@ func (p *Position) Buy(entryPrice float64, timestamp time.Time) {
 	p.EntryTime = timestamp
 }
 
-func (p *Position) Sell(exitPrice float64, timestamp time.Time) {
+func (p *Position) Sell(entryPrice float64, timestamp time.Time) {
 	p.Reset()
 	p.ID = uuid.New().String()
 	p.Kind = "SELL"
 	p.Type = "ENTRY"
-	p.ExitPrice = exitPrice
-	p.ExitTime = timestamp
-	p.Profit = exitPrice - p.EntryPrice
-	p.ProfitPercentage = (p.Profit / p.EntryPrice) * 100
+	p.EntryPrice = entryPrice
+	p.EntryTime = timestamp
 }
 
 func (p *Position) Exit(exitPrice float64, timestamp time.Time) {

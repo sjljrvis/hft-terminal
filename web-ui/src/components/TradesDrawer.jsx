@@ -1,4 +1,4 @@
-import { X, MagnifyingGlass } from "phosphor-react";
+import { X, MagnifyingGlass, Download } from "phosphor-react";
 
 function TradesDrawer({
   open,
@@ -6,26 +6,49 @@ function TradesDrawer({
   trades = [],
   filterValue = "",
   onFilterChange = () => { },
-  sortValue = "time-desc",
+  sortValue = "entryTime-desc",
   onSortChange = () => { },
   metrics = {},
 }) {
   const formatTime = (value) => {
     if (!value) return "-";
-    if (value instanceof Date) {
-      return value.toLocaleString("en-GB", { hour12: false });
-    }
-    return String(value);
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
   };
 
-  const formatCurrency = (value) => {
+  const formatPrice = (value) => {
     if (value === undefined || value === null || Number.isNaN(Number(value))) return "-";
-    return `${Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} INR`;
+    return Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const formatProfit = (value) => {
+    if (value === undefined || value === null || Number.isNaN(Number(value))) return "-";
+    const num = Number(value);
+    const sign = num >= 0 ? "+" : "";
+    return `${sign}${num.toFixed(2)}`;
   };
 
   const formatPercent = (value) => {
     if (value === undefined || value === null || Number.isNaN(Number(value))) return "-";
     return `${Number(value).toFixed(2)}%`;
+  };
+
+  const getReasonBadge = (reason) => {
+    const badges = {
+      PROFIT_TARGET: { label: "Target", className: "badge-profit" },
+      STOP_LOSS: { label: "SL", className: "badge-loss" },
+      TRAILING_STOP: { label: "Trail", className: "badge-trail" },
+      SIGNAL: { label: "Signal", className: "badge-signal" },
+    };
+    const badge = badges[reason] || { label: reason || "-", className: "" };
+    return <span className={`reason-badge ${badge.className}`}>{badge.label}</span>;
   };
 
   const toggleSort = (field) => {
@@ -40,11 +63,24 @@ function TradesDrawer({
     return <span className="sort-indicator">{curDir === "asc" ? "↑" : "↓"}</span>;
   };
 
+  const downloadCSV = () => {
+    const csv = trades.map((trade) => `${trade.entryTime},${trade.exitTime},${trade.type},${trade.entryPrice},${trade.exitPrice},${trade.profit},${trade.reason}`).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "trades.csv";
+    a.click();
+  };
+
   return (
     <div className={`trades-drawer ${open ? "is-open" : ""}`} aria-live="polite">
       <div className="trades-drawer__header">
-        <div className="trades-drawer__title">Recent Trades</div>
+        <div className="trades-drawer__title">Trades ({trades.length})</div>
         <div className="trades-drawer__actions">
+          <button type="button" className="trades-drawer__download" aria-label="Download trades" onClick={downloadCSV}>
+             <Download size={14} weight="regular" aria-hidden="true" /> Download
+          </button>
           <div className="trades-drawer__search">
             <MagnifyingGlass size={12} weight="regular" aria-hidden="true" />
             <input
@@ -68,81 +104,110 @@ function TradesDrawer({
               <tr>
                 <th
                   className="sortable"
-                  onClick={() => toggleSort("time")}
+                  onClick={() => toggleSort("entryTime")}
                   role="button"
-                  aria-sort={sortValue.startsWith("time-") ? sortValue.endsWith("asc") ? "ascending" : "descending" : "none"}
                 >
-                  Time {renderSortIndicator("time")}
+                  Entry {renderSortIndicator("entryTime")}
                 </th>
                 <th
                   className="sortable"
-                  onClick={() => toggleSort("side")}
+                  onClick={() => toggleSort("exitTime")}
                   role="button"
-                  aria-sort={sortValue.startsWith("side-") ? sortValue.endsWith("asc") ? "ascending" : "descending" : "none"}
                 >
-                  Side {renderSortIndicator("side")}
+                  Exit {renderSortIndicator("exitTime")}
                 </th>
                 <th
                   className="sortable"
-                  onClick={() => toggleSort("price")}
+                  onClick={() => toggleSort("type")}
                   role="button"
-                  aria-sort={sortValue.startsWith("price-") ? sortValue.endsWith("asc") ? "ascending" : "descending" : "none"}
                 >
-                  Price {renderSortIndicator("price")}
+                  Type {renderSortIndicator("type")}
                 </th>
                 <th
                   className="sortable"
-                  onClick={() => toggleSort("qty")}
+                  onClick={() => toggleSort("entryPrice")}
                   role="button"
-                  aria-sort={sortValue.startsWith("qty-") ? sortValue.endsWith("asc") ? "ascending" : "descending" : "none"}
                 >
-                  Qty {renderSortIndicator("qty")}
+                  Entry ₹ {renderSortIndicator("entryPrice")}
                 </th>
+                <th
+                  className="sortable"
+                  onClick={() => toggleSort("exitPrice")}
+                  role="button"
+                >
+                  Exit ₹ {renderSortIndicator("exitPrice")}
+                </th>
+                <th
+                  className="sortable"
+                  onClick={() => toggleSort("profit")}
+                  role="button"
+                >
+                  P&L {renderSortIndicator("profit")}
+                </th>
+                <th>Reason</th>
               </tr>
             </thead>
             <tbody>
-              {trades.map((trade, idx) => (
-                <tr key={idx}>
-                  <td>{formatTime(trade?.time)}</td>
-                  <td className={`trade-side ${trade?.side ?? ""}`}>{trade?.side ?? "-"}</td>
-                  <td>{trade?.price ?? "-"}</td>
-                  <td>{trade?.qty ?? "-"}</td>
-                </tr>
-              ))}
+              {trades.map((trade, idx) => {
+                const profit = trade?.profit ?? 0;
+                const profitClass = profit > 0 ? "profit-positive" : profit < 0 ? "profit-negative" : "";
+                return (
+                  <tr key={idx}>
+                    <td>{formatTime(trade?.entryTime)}</td>
+                    <td>{formatTime(trade?.exitTime)}</td>
+                    <td className={`trade-type ${(trade?.type || "").toLowerCase()}`}>
+                      {trade?.type ?? "-"}
+                    </td>
+                    <td>{formatPrice(trade?.entryPrice)}</td>
+                    <td>{formatPrice(trade?.exitPrice)}</td>
+                    <td className={profitClass}>
+                      {formatProfit(profit)}
+                      <span className="profit-pct"> ({formatPercent(trade?.profitPct)})</span>
+                    </td>
+                    <td>{getReasonBadge(trade?.reason)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
-
       </div>
       <div className="trades-drawer__footer metrics">
         <div>
-          <div className="metric-label">Total P&amp;L</div>
-          <div className="metric-value positive">
-            {formatCurrency(metrics.totalPnl ?? 0)}{" "}
-            <span className="metric-sub">+{formatPercent(metrics.totalPnlPct ?? 0)}</span>
+          <div className="metric-label">Net P&amp;L</div>
+          <div className={`metric-value ${metrics.totalPnl >= 0 ? "positive" : "negative"}`}>
+            {formatProfit(metrics.totalPnl ?? 0)} pts
           </div>
         </div>
         <div>
-          <div className="metric-label">Max equity drawdown</div>
-          <div className="metric-value">
-            {formatCurrency(metrics.maxDrawdown ?? 0)}{" "}
-            <span className="metric-sub">{formatPercent(metrics.maxDrawdownPct ?? 0)}</span>
+          <div className="metric-label">Max Drawdown</div>
+          <div className="metric-value negative">
+            {formatPrice(metrics.maxDrawdown ?? 0)} pts
           </div>
         </div>
         <div>
-          <div className="metric-label">Total trades</div>
+          <div className="metric-label">Total Trades</div>
           <div className="metric-value">{metrics.totalTrades ?? trades.length}</div>
         </div>
         <div>
-          <div className="metric-label">Profitable trades</div>
+          <div className="metric-label">Win Rate</div>
           <div className="metric-value">
-            {formatPercent(metrics.profitableTradesPct ?? 0)}{" "}
-            <span className="metric-sub">{metrics.profitableTradesCount ?? ""}</span>
+            {formatPercent(metrics.winRate ?? 0)}{" "}
+            <span className="metric-sub">{metrics.winCount ?? 0}/{metrics.totalTrades ?? trades.length}</span>
           </div>
         </div>
         <div>
-          <div className="metric-label">Profit factor</div>
-          <div className="metric-value">{metrics.profitFactor ?? "-"}</div>
+          <div className="metric-label">Profit Factor</div>
+          <div className="metric-value">{metrics.profitFactor?.toFixed(2) ?? "-"}</div>
+        </div>
+        <div>
+          <div className="metric-label">Exit Breakdown</div>
+          <div className="metric-value metric-breakdown">
+            <span className="badge-profit">T:{metrics.profitTargetCount ?? 0}</span>
+            <span className="badge-trail">Tr:{metrics.trailingStopCount ?? 0}</span>
+            <span className="badge-loss">SL:{metrics.stopLossCount ?? 0}</span>
+            <span className="badge-signal">S:{metrics.signalCount ?? 0}</span>
+          </div>
         </div>
       </div>
     </div>

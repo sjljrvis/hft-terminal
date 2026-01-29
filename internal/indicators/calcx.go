@@ -89,7 +89,7 @@ func CalcX(df *dataframe.DataFrame, seriesname string, source string, param floa
 //         swap := 0
 //     swap
 
-func isActiveSession(ts *time.Time) bool {
+func IsActiveSession(ts *time.Time) bool {
 	// Trading hours in IST: 09:20 to 15:20 inclusive.
 	if ts == nil || ts.IsZero() {
 		return false
@@ -98,8 +98,8 @@ func isActiveSession(ts *time.Time) bool {
 	ist := time.FixedZone("IST", 19800) // UTC+5:30
 	t := ts.In(ist)
 	mins := t.Hour()*60 + t.Minute()
-	start := 9*60 + 20 // 09:20
-	end := 15*60 + 20  // 15:20
+	start := 9*60 + 17 // 09:20
+	end := 15*60 + 25  // 15:20
 	return mins >= start && mins <= end
 }
 
@@ -152,7 +152,7 @@ func CalcSwap(df *dataframe.DataFrame, seriesname string, source string, avg_par
 			}
 		}
 
-		if !isActiveSession(_time[i]) {
+		if !IsActiveSession(_time[i]) {
 			swap[i] = 0
 		}
 	}

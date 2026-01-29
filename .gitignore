@@ -1,3 +1,4 @@
 web-ui/node_modules
 web-ui/dist
 hft.db
+.tmp

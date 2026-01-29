@@ -33,7 +33,7 @@ _x_smooth_len = input.int(5, title = "_x_ smoothing length", minval = 1)
 htg= input.bool(title = "Hide trend graph", defval = false)
 isActiveSession = false or not na(time(timeframe.period, session_slot))
 capture_points = input.int( 100, title = "Capture points", minval = 1)
-stop_loss_points = input.int( 60, title = "Stop loss points", minval = 1)
+stop_loss_points = input.int( 30, title = "Stop loss points", minval = 1)
 
 // ========== TRAILING STOP-LOSS SETTINGS ==========
 use_trailing_stop = input.bool(title = "Use Trailing Stop", defval = true, group = "Trailing Stop")
@@ -95,7 +95,7 @@ calcx(source, param, atr, cci)=>
 
 
 tempx = calcx( close , 2, 2, fast_cci) // 0.5
-tempx_base = calcx( close , 0.1, 400, slow_cci) // 2.5
+tempx_base = calcx( close , 0.1, 900, slow_cci) // 2.5
 
 _ema_200_ = ema200
 _close_ema200_diff = math.abs(close - _ema_200_)
@@ -107,9 +107,9 @@ emaBuffFar = (2.8/100)*ema200
 // _x_raw =  ((( 0 * ta.ema(ohlc4,200)) + (  100* tempx)) /100)
 // _x_ = _x_raw
 
-_x_ = ta.ema(tempx, 5) //ta.ema(_x_raw, _x_smooth_len)
+_x_ = ta.ema(tempx, 3) //ta.ema(_x_raw, _x_smooth_len)
 
-_x_base =  ta.ema(tempx_base,2)
+_x_base =  ta.ema(tempx_base,5)
 
 open_strategy_profit () => 
     p = 0.0

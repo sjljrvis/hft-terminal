@@ -22,6 +22,7 @@ func enableCORS(w http.ResponseWriter) {
 func APIHandler(mode string, dbPath string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hft/status", HFTStatusHandler)
+	mux.HandleFunc("/trades", TradesHandler)
 	mux.HandleFunc("/ticks", TicksHandler(dbPath))
 	return mux
 }
@@ -50,10 +51,19 @@ func TicksHandler(dbPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		enableCORS(w)
 		// return backtest.Current.DF as json
-		backtest.ToJSON()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(backtest.ToJSON())
 	}
+}
+
+func TradesHandler(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(backtest.TradesToJSON())
 }
 
 var (

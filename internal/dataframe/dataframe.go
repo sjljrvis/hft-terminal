@@ -19,6 +19,34 @@ func InitDataFrame() *dataframe.DataFrame {
 	return _dataFrame
 }
 
+func InitTradeDataFrame() *dataframe.DataFrame {
+	// entry price, exit price, entry time, exit time, profit
+	_entryPrice := dataframe.NewSeriesFloat64("entryPrice", nil)
+	_exitPrice := dataframe.NewSeriesFloat64("exitPrice", nil)
+	_entryTime := dataframe.NewSeriesTime("entryTime", nil)
+	_exitTime := dataframe.NewSeriesTime("exitTime", nil)
+	_profit := dataframe.NewSeriesFloat64("profit", nil)
+	_profitPct := dataframe.NewSeriesFloat64("profitPct", nil)
+	_type := dataframe.NewSeriesString("type", nil)
+	_reason := dataframe.NewSeriesString("reason", nil)
+	_dataFrame := dataframe.NewDataFrame(_entryPrice, _exitPrice, _entryTime, _exitTime, _profit, _profitPct, _type, _reason)
+	return _dataFrame
+}
+
+// AppendTrade adds a completed trade to the trade dataframe
+func AppendTrade(df *dataframe.DataFrame, entryPrice, exitPrice float64, entryTime, exitTime time.Time, profit, profitPct float64, tradeType, reason string) {
+	df.Append(nil, map[string]interface{}{
+		"entryPrice": entryPrice,
+		"exitPrice":  exitPrice,
+		"entryTime":  entryTime,
+		"exitTime":   exitTime,
+		"profit":     profit,
+		"profitPct":  profitPct,
+		"type":       tradeType,
+		"reason":     reason,
+	})
+}
+
 func loadTicksToDataFrame(df *dataframe.DataFrame, ticks []types.Tick) {
 	for _, tick := range ticks {
 		df.Append(nil, map[string]interface{}{
