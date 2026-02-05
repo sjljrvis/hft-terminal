@@ -7,13 +7,122 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [ticks, setTicks] = useState([]);
+  const [hoverValues, setHoverValues] = useState(null);
   const chartContainerRef = useRef(null);
   const resizeObserverRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
-  const lineSeriesRef = useRef(null);
-  const lineSeriesBaseRef = useRef(null);
+  const lineSeriesSlowRef = useRef(null);
+  const lineSeriesFastRef = useRef(null);
+  const pendingDateKeyRef = useRef(null);
 
+  const toDateKey = useCallback((value) => {
+    const parseValue = (raw) => {
+      if (raw instanceof Date) {
+        const ms = raw.getTime();
+        return Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : null;
+      }
+      if (typeof raw === "number") {
+        const ms = raw < 1e12 ? raw * 1000 : raw;
+        return Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : null;
+      }
+      if (typeof raw === "string") {
+        const trimmed = raw.trim();
+        if (!trimmed) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+        const parsed = new Date(trimmed);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+      }
+      return null;
+    };
+
+    if (value && typeof value === "object" && !(value instanceof Date)) {
+      const candidate = value.date ?? value.value ?? value.timestamp ?? value.time;
+      if (candidate !== undefined) return parseValue(candidate);
+    }
+    return parseValue(value);
+  }, []);
+
+  const getTickDateKey = useCallback((timeSeconds) => {
+    if (!Number.isFinite(timeSeconds)) return null;
+    return new Date(timeSeconds * 1000).toISOString().slice(0, 10);
+  }, []);
+
+  const focusDateKey = useCallback(
+    (dateKey) => {
+      if (!dateKey || !chartRef.current || !ticks.length) return false;
+
+      let from = null;
+      let to = null;
+      let prevTs = null;
+      let nextTs = null;
+
+      for (const tick of ticks) {
+        const ts = tick?.timeIst ?? tick?.time;
+        if (!Number.isFinite(ts)) continue;
+        const key = getTickDateKey(ts);
+        if (!key) continue;
+
+        if (key === dateKey) {
+          if (from === null) from = ts;
+          to = ts;
+          continue;
+        }
+
+        if (from !== null) break;
+        if (key < dateKey) prevTs = ts;
+        if (key > dateKey) {
+          nextTs = ts;
+          break;
+        }
+      }
+
+      if (from !== null && to !== null) {
+        const span = Math.max(to - from, 60 * 5);
+        const center = from + (to - from) / 2;
+        chartRef.current.timeScale().setVisibleRange({
+          from: center - span / 2,
+          to: center + span / 2,
+        });
+        return true;
+      }
+
+      const target = nextTs ?? prevTs;
+      if (Number.isFinite(target)) {
+        const padding = 60 * 30;
+        chartRef.current.timeScale().setVisibleRange({
+          from: target - padding,
+          to: target + padding,
+        });
+        return true;
+      }
+
+      return false;
+    },
+    [getTickDateKey, ticks]
+  );
+
+  const requestDateFocus = useCallback(
+    (payload) => {
+      const dateKey = toDateKey(payload);
+      if (!dateKey) return;
+      pendingDateKeyRef.current = dateKey;
+      if (focusDateKey(dateKey)) {
+        pendingDateKeyRef.current = null;
+      }
+    },
+    [focusDateKey, toDateKey]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleDateChange = (event) => {
+      const detail = event?.detail ?? event;
+      requestDateFocus(detail);
+    };
+    window.addEventListener("onDateChange", handleDateChange);
+    return () => window.removeEventListener("onDateChange", handleDateChange);
+  }, [requestDateFocus]);
 
   const measureDimensions = useCallback(() => {
     // Fixed-height; width follows available chart area
@@ -66,8 +175,9 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
       high: Number(tick?.high) || 0,
       low: Number(tick?.low) || 0,
       close: Number(tick?.close) || 0,
-      tempx: Number.isFinite(Number(tick?.tempx)) ? Number(tick?.tempx) : undefined,
-      tempx_base: Number.isFinite(Number(tick?.tempx_base)) ? Number(tick?.tempx_base) : undefined,
+      fast_tempx: Number.isFinite(Number(tick?.fast_tempx)) ? Number(tick?.fast_tempx) : undefined,
+      slow_tempx: Number.isFinite(Number(tick?.slow_tempx)) ? Number(tick?.slow_tempx) : undefined,
+
       swap: Number.isFinite(Number(tick?.swap)) ? Number(tick?.swap) : undefined,
       swap_base: Number.isFinite(Number(tick?.swap_base)) ? Number(tick?.swap_base) : undefined,
       timeIst: tsIst,
@@ -78,6 +188,11 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
     if (swapVal === 1) return "#00e6a8"; // cyan-green
     if (swapVal === -1) return "#ff4da6"; // magenta-pink
     return "#facc15"; // yellow for 0 / default
+  }, []);
+
+  const formatValue = useCallback((value) => {
+    if (!Number.isFinite(value)) return "--";
+    return String(value);
   }, []);
 
 
@@ -221,19 +336,48 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
       });
       candleSeriesRef.current = candles;
 
-      const line = chart.addSeries(LineSeries, {
+      const lineSlow = chart.addSeries(LineSeries, {
         color: colors.greenCandle,
-        lineWidth: 2,
+        lineWidth: 3,
         crosshairMarkerVisible: false,
       });
-      lineSeriesRef.current = line;
+      lineSeriesSlowRef.current = lineSlow; 
 
-      const lineBase = chart.addSeries(LineSeries, {
+      const lineFast = chart.addSeries(LineSeries, {
         color: colors.accent,
         lineWidth: 2,
         crosshairMarkerVisible: false,
       });
-      lineSeriesBaseRef.current = lineBase;
+      lineSeriesFastRef.current = lineFast;
+
+      const handleCrosshairMove = (param) => {
+        if (!param?.time || !param?.point) {
+          setHoverValues(null);
+          return;
+        }
+        const candleData = param.seriesData?.get?.(candles);
+        const lineSlowData = param.seriesData?.get?.(lineSlow);
+        const lineFastData = param.seriesData?.get?.(lineFast);
+
+        if (!candleData && !lineSlowData && !lineFastData) {
+          setHoverValues(null);
+          return;
+        }
+
+        setHoverValues({
+          open: candleData?.open,
+          high: candleData?.high,
+          low: candleData?.low,
+          close: candleData?.close,
+          lineSlow: lineSlowData?.value,
+          lineSlowColor: lineSlowData?.color,
+          lineFast: lineFastData?.value,
+          lineFastColor: lineFastData?.color,
+          deviationFactor: Math.abs(lineSlowData?.value - lineFastData?.value)
+        });
+      };
+
+      chart.subscribeCrosshairMove(handleCrosshairMove);
 
       chart.timeScale().fitContent();
       chartRef.current = chart;
@@ -254,13 +398,14 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
 
       return () => {
         window.removeEventListener("resize", resize);
+        chart.unsubscribeCrosshairMove(handleCrosshairMove);
         if (resizeObserverRef.current) {
           resizeObserverRef.current.disconnect();
         }
         chartRef.current = null;
         candleSeriesRef.current = null;
-        lineSeriesRef.current = null;
-        lineSeriesBaseRef.current = null;
+        lineSeriesSlowRef.current = null;
+        lineSeriesFastRef.current = null;
         chart.remove();
       };
     } catch (err) {
@@ -277,32 +422,40 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
       const candleData = ticks.map((t) => ({ ...t, time: t.timeIst ?? t.time }));
       candleSeriesRef.current.setData(candleData);
     }
-    if (lineSeriesRef.current) {
+
+    if (lineSeriesSlowRef.current) {
       const lineData = ticks
-        .filter((t) => typeof t.tempx === "number" && Number.isFinite(t.tempx))
+        .filter((t) => typeof t.slow_tempx === "number" && Number.isFinite(t.slow_tempx))
         .map((t) => ({
           time: t.timeIst ?? t.time,
-          value: t.tempx,
-          color: swapColor(t.swap),
-        }));
-      if (lineData.length) {
-        lineSeriesRef.current.setData(lineData);
-      }
-    }
-    if (lineSeriesBaseRef.current) {
-      const lineDataBase = ticks
-        .filter((t) => typeof t.tempx_base === "number" && Number.isFinite(t.tempx_base))
-        .map((t) => ({
-          time: t.timeIst ?? t.time,
-          value: t.tempx_base,
+          value: t.slow_tempx,
           color: swapColor(t.swap_base),
         }));
+      if (lineData.length) {
+        lineSeriesSlowRef.current.setData(lineData);
+      }
+    }
+    if (lineSeriesFastRef.current) {
+      const lineDataBase = ticks
+        .filter((t) => typeof t.fast_tempx === "number" && Number.isFinite(t.fast_tempx))
+        .map((t) => ({
+          time: t.timeIst ?? t.time,
+          value: t.fast_tempx,
+          color: swapColor(t.swap),
+        }));
       if (lineDataBase.length) {
-        lineSeriesBaseRef.current.setData(lineDataBase);
+        lineSeriesFastRef.current.setData(lineDataBase);
       }
     }
     chartRef.current?.timeScale().fitContent();
   }, [ticks]);
+
+  useEffect(() => {
+    if (!pendingDateKeyRef.current) return;
+    if (focusDateKey(pendingDateKeyRef.current)) {
+      pendingDateKeyRef.current = null;
+    }
+  }, [focusDateKey, ticks]);
 
   // Re-apply colors when theme class on body changes
   useEffect(() => {
@@ -314,6 +467,16 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
     return () => observer.disconnect();
   }, [applyThemeOptions]);
 
+  const isBearish =
+    hoverValues &&
+    Number.isFinite(hoverValues.open) &&
+    Number.isFinite(hoverValues.close)
+      ? hoverValues.close < hoverValues.open
+      : null;
+  const candleColor =
+    isBearish === null ? undefined : isBearish ? "var(--red-candle)" : "var(--green-candle)";
+  const lineColor = hoverValues?.lineSlowColor || "var(--green-candle)";
+  const lineFastColor = hoverValues?.lineFastColor || "var(--accent)";
 
   return (
     <section className="chart-panel">
@@ -326,6 +489,29 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
               className="chart-canvas__inner"
               style={{ width: "100%", height: "100%" }}
             />
+            {hoverValues && (
+              <div className="chart-hover-values">
+                <span style={{ color: candleColor }}>
+                  O {formatValue(hoverValues.open)}
+                </span>
+                <span style={{ color: candleColor }}>
+                  H {formatValue(hoverValues.high)}
+                </span>
+                <span style={{ color: candleColor }}>
+                  L {formatValue(hoverValues.low)}
+                </span>
+                <span style={{ color: candleColor }}>
+                  C {formatValue(hoverValues.close)}
+                </span>
+                <span style={{ color: lineColor }}>
+                  Line Slow {formatValue(hoverValues.lineSlow)}
+                </span>
+                <span style={{ color: lineFastColor }}>
+                  Line Fast {formatValue(hoverValues.lineFast)}
+                </span>
+                <span style={{ color: 'white' }}>Deviation Factor: {formatValue(hoverValues.deviationFactor)}</span>
+              </div>
+            )}
             {/* {loading && <div className="chart-canvas__overlay muted">Loading chart…</div>}
             {error && <div className="chart-canvas__overlay error">{error}</div>} */}
           </div>

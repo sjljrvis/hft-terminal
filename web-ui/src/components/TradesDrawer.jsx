@@ -1,4 +1,4 @@
-import { X, MagnifyingGlass, Download } from "phosphor-react";
+import { X, MagnifyingGlass, Download, CrosshairSimple } from "phosphor-react";
 
 function TradesDrawer({
   open,
@@ -64,7 +64,7 @@ function TradesDrawer({
   };
 
   const downloadCSV = () => {
-    const csv = trades.map((trade) => `${trade.entryTime},${trade.exitTime},${trade.type},${trade.entryPrice},${trade.exitPrice},${trade.profit},${trade.reason}`).join("\n");
+    const csv = trades.map((trade) => `${trade.entryTime},${trade.exitTime},${trade.type},${trade.entryPrice},${trade.exitPrice},${trade.profit}, ${trade.peakProfit}, ${trade.peakLoss}, ${trade.reason}`).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -79,7 +79,7 @@ function TradesDrawer({
         <div className="trades-drawer__title">Trades ({trades.length})</div>
         <div className="trades-drawer__actions">
           <button type="button" className="trades-drawer__download" aria-label="Download trades" onClick={downloadCSV}>
-             <Download size={14} weight="regular" aria-hidden="true" /> Download
+            <Download size={14} weight="regular" aria-hidden="true" /> Download
           </button>
           <div className="trades-drawer__search">
             <MagnifyingGlass size={12} weight="regular" aria-hidden="true" />
@@ -107,6 +107,8 @@ function TradesDrawer({
                   onClick={() => toggleSort("entryTime")}
                   role="button"
                 >
+
+
                   Entry {renderSortIndicator("entryTime")}
                 </th>
                 <th
@@ -144,6 +146,16 @@ function TradesDrawer({
                 >
                   P&L {renderSortIndicator("profit")}
                 </th>
+                <th
+                  className="sortable"
+                  onClick={() => toggleSort("peakProfit")}
+                  role="button"
+                >Peak Profit {renderSortIndicator("peakProfit")}</th>
+                <th
+                  className="sortable"
+                  onClick={() => toggleSort("peakLoss")}
+                  role="button"
+                >Peak Loss {renderSortIndicator("peakLoss")}</th>
                 <th>Reason</th>
               </tr>
             </thead>
@@ -153,7 +165,18 @@ function TradesDrawer({
                 const profitClass = profit > 0 ? "profit-positive" : profit < 0 ? "profit-negative" : "";
                 return (
                   <tr key={idx}>
-                    <td>{formatTime(trade?.entryTime)}</td>
+                    <td>
+                      <span>
+                        <CrosshairSimple size={12} weight="regular" aria-hidden="true"
+                          onClick={() => {
+                            // send event to chart panel to focus on this date
+                            window.dispatchEvent(new CustomEvent("onDateChange", { detail: { date: trades[0].entryTime } }));
+                          }}
+                        />
+                      </span>
+                      {formatTime(trade?.entryTime)}
+
+                    </td>
                     <td>{formatTime(trade?.exitTime)}</td>
                     <td className={`trade-type ${(trade?.type || "").toLowerCase()}`}>
                       {trade?.type ?? "-"}
@@ -163,6 +186,12 @@ function TradesDrawer({
                     <td className={profitClass}>
                       {formatProfit(profit)}
                       <span className="profit-pct"> ({formatPercent(trade?.profitPct)})</span>
+                    </td>
+                    <td>
+                      {formatPrice(trade?.peakProfit)}
+                    </td>
+                    <td>
+                      {formatPrice(trade?.peakLoss)}
                     </td>
                     <td>{getReasonBadge(trade?.reason)}</td>
                   </tr>

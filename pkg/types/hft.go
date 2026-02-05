@@ -33,6 +33,8 @@ type Position struct {
 	ExitTime         time.Time
 	Profit           float64
 	ProfitPercentage float64
+	PeakProfit       float64
+	PeakLoss         float64
 }
 
 func (p *Position) Reset() {
@@ -46,6 +48,8 @@ func (p *Position) Reset() {
 	p.ExitTime = time.Now()
 	p.Profit = 0
 	p.ProfitPercentage = 0
+	p.PeakProfit = 0
+	p.PeakLoss = 0
 }
 
 func (p *Position) Buy(entryPrice float64, timestamp time.Time) {

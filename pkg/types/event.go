@@ -12,4 +12,6 @@ type Event struct {
 	EntryPrice float64
 	Timestamp  time.Time
 	Reason     string // Exit reason: PROFIT_TARGET, STOP_LOSS, TRAILING_STOP, SIGNAL
+	PeakProfit float64
+	PeakLoss   float64
 }

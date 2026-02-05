@@ -94,7 +94,7 @@ calcx(source, param, atr, cci)=>
     x
 
 
-tempx = calcx( close , 2, 2, fast_cci) // 0.5
+tempx = calcx( close , 1.95, 2, fast_cci) // 0.5
 tempx_base = calcx( close , 0.1, 900, slow_cci) // 2.5
 
 _ema_200_ = ema200

@@ -12,29 +12,39 @@ import (
 
 // TrailingStopConfig holds configuration for trailing stop-loss
 type TrailingStopConfig struct {
-	UseTrailingStop           bool
-	TrailActivationPoints     float64 // Start trailing after this profit (in points)
-	TrailDistancePoints       float64 // Distance to maintain from highest profit
-	UseATRTrailing            bool
-	ATRTrailingMultiplier     float64
-	UseBreakeven              bool
-	BreakevenActivationPoints float64 // Move stop to breakeven after this profit
-	CapturePoints             float64 // Target profit points
-	StopLossPoints            float64 // Fixed stop loss points
+	UseTrailingStop            bool
+	TrailActivationPoints      float64 // Start trailing after this profit (in points)
+	TrailDistancePoints        float64 // Distance to maintain from highest profit
+	UseATRTrailing             bool
+	ATRTrailingMultiplier      float64
+	UseBreakeven               bool
+	BreakevenActivationPoints  float64 // Move stop to breakeven after this profit
+	CapturePoints              float64 // Target profit points
+	StopLossPoints             float64 // Fixed stop loss points
+	StopLossAtrMultiplier      float64 // ATR multiplier for stop loss points
+	TightStopLossAtrMultiplier float64 // ATR multiplier after streak threshold
+	StreakMinProfitPoints      float64 // Min profit per trade for streak (inclusive)
+	StreakMaxProfitPoints      float64 // Max profit per trade for streak (inclusive)
+	StreakLengthForTighten     int     // Streak length to activate tighter stop
 }
 
 // DefaultTrailingStopConfig returns default trailing stop configuration matching Pine Script
 func DefaultTrailingStopConfig() *TrailingStopConfig {
 	return &TrailingStopConfig{
-		UseTrailingStop:           true,
-		TrailActivationPoints:     10.0,
-		TrailDistancePoints:       10.0,
-		UseATRTrailing:            true,
-		ATRTrailingMultiplier:     0.55,
-		UseBreakeven:              true,
-		BreakevenActivationPoints: 10.0,
-		CapturePoints:             100.0,
-		StopLossPoints:            100.0,
+		UseTrailingStop:            true,
+		TrailActivationPoints:      10.0,
+		TrailDistancePoints:        10.0,
+		BreakevenActivationPoints:  10.0,
+		UseATRTrailing:             true,
+		ATRTrailingMultiplier:      0.55,
+		UseBreakeven:               true,
+		StopLossAtrMultiplier:      4.5,
+		TightStopLossAtrMultiplier: 4.5,
+		StreakMinProfitPoints:      0.0,
+		StreakMaxProfitPoints:      10.0,
+		StreakLengthForTighten:     4,
+		CapturePoints:              40.0,
+		StopLossPoints:             100.0,
 	}
 }
 
@@ -46,6 +56,9 @@ type TrailingStopState struct {
 	TrailingStopShort       float64
 	BreakevenActivatedLong  bool
 	BreakevenActivatedShort bool
+	StreakCount             int
+	TightStopActive         bool
+	StreakDay               string
 }
 
 // NewTrailingStopState creates a new trailing stop state
@@ -71,18 +84,18 @@ func Run(df *dataframe.DataFrame) {
 	log.Println("running strategy")
 	start := time.Now()
 	indicators.OHLC4(df, "ohlc4")
-	indicators.EMA(df, "ema_ohlc4", "ohlc4", 2)
-	indicators.CCI(df, "fast_cci", "ema_ohlc4", 2)
-	indicators.CCI(df, "slow_cci", "ema_ohlc4", 14)
+	indicators.EMA(df, "ema_ohlc4", "ohlc4", 10)
+	indicators.CCI(df, "fast_cci", "close", 3)
+	indicators.CCI(df, "slow_cci", "close", 14)
 	indicators.ATR(df, "tr", "close", 14)
 	indicators.ATR(df, "general_atr", "close", 3)
 	indicators.WMA(df, "wma_tr_2", "tr", 900)
 	indicators.WMA(df, "wma_tr_400", "tr", 1200)
 
-	indicators.CalcX(df, "tempx", "close", 1.95, 2, "fast_cci", "wma_tr_2")
-	indicators.CalcX(df, "tempx_base", "close", 0.25, 2, "slow_cci", "wma_tr_400")
+	indicators.CalcX(df, "tempx", "close", 1, 2, "fast_cci", "wma_tr_2")
+	indicators.CalcX(df, "tempx_base", "close", 0.1, 2, "slow_cci", "wma_tr_400")
 
-	indicators.EMA(df, "ema_tempx", "tempx", 6)
+	indicators.EMA(df, "ema_tempx", "tempx", 1)
 	indicators.EMA(df, "ema_tempx_base", "tempx_base", 6)
 
 	indicators.SMA(df, "sma_tempx", "tempx", 10)
@@ -90,8 +103,8 @@ func Run(df *dataframe.DataFrame) {
 
 	indicators.ATR(df, "atr_ema_tempx", "ema_tempx", 5)
 	indicators.SMA(df, "sma_atr_ema_tempx", "atr_ema_tempx", 10)
-	indicators.CalcSwap(df, "swap", "ema_tempx", "sma_tempx")
-	indicators.CalcSwap(df, "swap_base", "ema_tempx_base", "sma_tempx_base")
+	indicators.CalcSwap(df, "swap", "tempx", "sma_tempx")
+	indicators.CalcSwap(df, "swap_base", "tempx_base", "sma_tempx_base")
 	log.Println("time taken to calculate indicators", time.Since(start))
 	// log.Println(df.Table())
 }
@@ -117,7 +130,24 @@ func FindSignalsWithTrailingStop(df *dataframe.DataFrame, current_position *type
 	}
 
 	for i := 0; i < _dataframe_length; i++ {
-		stop_loss_points := math.Min(config.StopLossPoints, _general_atr[i]*4.5)
+		currentDay := ""
+		if _timestamp[i] != nil {
+			currentDay = _timestamp[i].Format("2006-01-02")
+		}
+		if tsState.StreakDay == "" {
+			tsState.StreakDay = currentDay
+		}
+		if currentDay != "" && currentDay != tsState.StreakDay {
+			tsState.StreakDay = currentDay
+			tsState.StreakCount = 0
+			tsState.TightStopActive = false
+		}
+
+		stopLossAtrMultiplier := config.StopLossAtrMultiplier
+		if tsState.TightStopActive {
+			stopLossAtrMultiplier = config.TightStopLossAtrMultiplier
+		}
+		stop_loss_points := math.Min(config.StopLossPoints, _general_atr[i]*stopLossAtrMultiplier)
 		_buy_condition := _swap[i] == 1 && _swap_base[i] == 1
 		_sell_condition := _swap[i] == -1 && _swap_base[i] == -1
 
@@ -220,6 +250,17 @@ func FindSignalsWithTrailingStop(df *dataframe.DataFrame, current_position *type
 		if shouldCloseSell || !indicators.IsActiveSession(_timestamp[i]) {
 			exitReason := getExitReason(profitHit, stopHit, trailingStopHitShort, _buy_condition)
 			current_position.Exit(_close[i], *_timestamp[i])
+			if current_position.Kind != "" {
+				tradeProfit := current_position.Profit
+				if tradeProfit >= config.StreakMinProfitPoints && tradeProfit <= config.StreakMaxProfitPoints {
+					tsState.StreakCount++
+				} else {
+					tsState.StreakCount = 0
+				}
+				if tsState.StreakCount >= config.StreakLengthForTighten {
+					tsState.TightStopActive = true
+				}
+			}
 			current_position.Reset()
 			tsState.ResetShort()
 			events <- &types.Event{
@@ -234,6 +275,17 @@ func FindSignalsWithTrailingStop(df *dataframe.DataFrame, current_position *type
 		if shouldCloseBuy || !indicators.IsActiveSession(_timestamp[i]) {
 			exitReason := getExitReason(profitHit, stopHit, trailingStopHitLong, _sell_condition)
 			current_position.Exit(_close[i], *_timestamp[i])
+			if current_position.Kind != "" {
+				tradeProfit := current_position.Profit
+				if tradeProfit >= config.StreakMinProfitPoints && tradeProfit <= config.StreakMaxProfitPoints {
+					tsState.StreakCount++
+				} else {
+					tsState.StreakCount = 0
+				}
+				if tsState.StreakCount >= config.StreakLengthForTighten {
+					tsState.TightStopActive = true
+				}
+			}
 			current_position.Reset()
 			tsState.ResetLong()
 			events <- &types.Event{

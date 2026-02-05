@@ -36,6 +36,8 @@ func Reset() {
 			EntryTime:  time.Now(),
 			ExitPrice:  0,
 			ExitTime:   time.Now(),
+			PeakProfit: 0,
+			PeakLoss:   0,
 		},
 		TradeDF: dataframe.InitTradeDataFrame(),
 	}
@@ -56,6 +58,8 @@ func InitBacktest() {
 			EntryTime:  time.Now(),
 			ExitPrice:  0,
 			ExitTime:   time.Now(),
+			PeakProfit: 0,
+			PeakLoss:   0,
 		},
 	}
 }
@@ -98,6 +102,9 @@ func SubscribeSignals() {
 				EntryTime:  event.Timestamp,
 			}
 		} else if event.Type == "EXIT" && pendingPosition != nil {
+			pendingPosition.PeakProfit = event.PeakProfit
+			pendingPosition.PeakLoss = event.PeakLoss
+
 			// Calculate profit for the completed trade
 			var profit float64
 			if pendingPosition.Kind == "BUY" {
@@ -123,6 +130,8 @@ func SubscribeSignals() {
 				profitPct,
 				pendingPosition.Kind,
 				event.Reason,
+				pendingPosition.PeakProfit,
+				pendingPosition.PeakLoss,
 			)
 
 			// Update statistics
@@ -239,7 +248,7 @@ func GetBacktestStats() *BacktestStats {
 // Run executes a minimal backtest pass: load all ticks and report count.
 func Run() {
 	log.Println("backtest: starting")
-	startDate := "2022-01-01"
+	startDate := "2025-01-01"
 	endDate := "2026-01-01"
 	InitBacktest()
 
@@ -260,8 +269,9 @@ func Run() {
 
 	log.Printf("backtest: loaded %d ticks", len(ticks))
 	dataframe.LoadHistoryBacktest(df, ticks)
-	strategy.Run(df)
-	strategy.FindSignals(df, Instance.Position, Instance.Positions, Instance.Events)
+	strategy.RunKalman(df)
+	strategy.FindKalmanSignal(df, Instance.Position, Instance.Positions, Instance.Events)
+	// strategy.FindSignals(df, Instance.Position, Instance.Positions, Instance.Events)
 
 	// Close events channel to trigger summary printout
 	close(Instance.Events)
@@ -283,8 +293,8 @@ func ToJSON() []map[string]interface{} {
 			"timestamp":  _data_frame.Series[indicators.FindIndexOf(_data_frame, "timestamp")].Value(i),
 			"swap":       _data_frame.Series[indicators.FindIndexOf(_data_frame, "swap")].Value(i),
 			"swap_base":  _data_frame.Series[indicators.FindIndexOf(_data_frame, "swap_base")].Value(i),
-			"tempx":      _data_frame.Series[indicators.FindIndexOf(_data_frame, "ema_tempx")].Value(i),
-			"tempx_base": _data_frame.Series[indicators.FindIndexOf(_data_frame, "ema_tempx_base")].Value(i),
+			"fast_tempx": _data_frame.Series[indicators.FindIndexOf(_data_frame, "fast_tempx_kalman")].Value(i),
+			"slow_tempx": _data_frame.Series[indicators.FindIndexOf(_data_frame, "slow_tempx_kalman")].Value(i),
 		}
 	}
 	return _json
@@ -305,6 +315,8 @@ func TradesToJSON() []map[string]interface{} {
 			"profit":     tradeDF.Series[indicators.FindIndexOf(tradeDF, "profit")].Value(i),
 			"profitPct":  tradeDF.Series[indicators.FindIndexOf(tradeDF, "profitPct")].Value(i),
 			"type":       tradeDF.Series[indicators.FindIndexOf(tradeDF, "type")].Value(i),
+			"peakProfit": tradeDF.Series[indicators.FindIndexOf(tradeDF, "peakProfit")].Value(i),
+			"peakLoss":   tradeDF.Series[indicators.FindIndexOf(tradeDF, "peakLoss")].Value(i),
 			"reason":     tradeDF.Series[indicators.FindIndexOf(tradeDF, "reason")].Value(i),
 		}
 	}

@@ -111,6 +111,7 @@ func CalcSwap(df *dataframe.DataFrame, seriesname string, source string, avg_par
 	_high := df.Series[FindIndexOf(df, "high")].(*dataframe.SeriesFloat64).Values
 	_low := df.Series[FindIndexOf(df, "low")].(*dataframe.SeriesFloat64).Values
 	_close := df.Series[FindIndexOf(df, "close")].(*dataframe.SeriesFloat64).Values
+	// _open := df.Series[FindIndexOf(df, "open")].(*dataframe.SeriesFloat64).Values
 
 	// Pine parity: check ATR expansion on price bars and use ATR(5) smoothed by SMA(10) as the
 	// "no change" threshold. ATR library returns a slice per price input; only the first slice is needed.
@@ -136,13 +137,18 @@ func CalcSwap(df *dataframe.DataFrame, seriesname string, source string, avg_par
 				}
 			}
 
-			// Pine compares current rounded value with the value two bars back.
+			// // Pine compares current rounded value with the value two bars back.
 			_pr := math.Round((_source[i] * 1000)) / 1000
 			_pr_2 := math.Round((_source[i-2] * 1000)) / 1000
 
 			if math.Abs(_pr-_pr_2) < atrEma[i] {
 				swap[i] = swap[i-1]
 			}
+
+			// if math.Abs(_source[i]-_source[i-1]) < 0.3*atr3[i] {
+			// 	swap[i] = swap[i-1]
+			// }
+
 		} else {
 			// Early bars: fall back to simple comparison when insufficient history.
 			if _source[i] > _avg_param[i] {

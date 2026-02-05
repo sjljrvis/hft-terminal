@@ -29,12 +29,14 @@ func InitTradeDataFrame() *dataframe.DataFrame {
 	_profitPct := dataframe.NewSeriesFloat64("profitPct", nil)
 	_type := dataframe.NewSeriesString("type", nil)
 	_reason := dataframe.NewSeriesString("reason", nil)
-	_dataFrame := dataframe.NewDataFrame(_entryPrice, _exitPrice, _entryTime, _exitTime, _profit, _profitPct, _type, _reason)
+	_peakProfit := dataframe.NewSeriesFloat64("peakProfit", nil)
+	_peakLoss := dataframe.NewSeriesFloat64("peakLoss", nil)
+	_dataFrame := dataframe.NewDataFrame(_entryPrice, _exitPrice, _entryTime, _exitTime, _profit, _profitPct, _type, _reason, _peakProfit, _peakLoss)
 	return _dataFrame
 }
 
 // AppendTrade adds a completed trade to the trade dataframe
-func AppendTrade(df *dataframe.DataFrame, entryPrice, exitPrice float64, entryTime, exitTime time.Time, profit, profitPct float64, tradeType, reason string) {
+func AppendTrade(df *dataframe.DataFrame, entryPrice, exitPrice float64, entryTime, exitTime time.Time, profit, profitPct float64, tradeType, reason string, peakProfit, peakLoss float64) {
 	df.Append(nil, map[string]interface{}{
 		"entryPrice": entryPrice,
 		"exitPrice":  exitPrice,
@@ -44,6 +46,8 @@ func AppendTrade(df *dataframe.DataFrame, entryPrice, exitPrice float64, entryTi
 		"profitPct":  profitPct,
 		"type":       tradeType,
 		"reason":     reason,
+		"peakProfit": peakProfit,
+		"peakLoss":   peakLoss,
 	})
 }
 

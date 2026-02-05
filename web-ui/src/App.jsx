@@ -83,7 +83,7 @@ const calculateMetrics = (trades) => {
 };
 
 function App() {
-  const [theme, setTheme] = useState("light");
+  const [theme, setTheme] = useState("dark");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [logsOpen, setLogsOpen] = useState(false);
   const [logSize, setLogSize] = useState("min"); // "min" | "max"

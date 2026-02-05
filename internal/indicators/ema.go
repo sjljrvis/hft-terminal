@@ -14,7 +14,8 @@ func EMA(df *dataframe.DataFrame, seriesname string, source string, period int) 
 
 	result := ta.Ema(period, _source.Values)
 	for i := 0; i < length; i++ {
-		result[i] = math.Round(result[i]*100) / 100
+		// result[i] = math.Round(result[i]*100) / 100
+		result[i] = math.Ceil(result[i])
 	}
 	_ema := dataframe.NewSeriesFloat64(seriesname, nil, result)
 	df.AddSeries(_ema, nil)
