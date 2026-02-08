@@ -8,19 +8,19 @@ import (
 
 var (
 	KalmanFFTWindow        = 64
-	KalmanFFTCutoffDivisor = 256
+	KalmanFFTCutoffDivisor = 128
 )
 
-func CalcSWAPKalman(df *dataframe.DataFrame, seriesname string, source string, deep bool) {
+func CalcSWAPKalman(df *dataframe.DataFrame, seriesname string, source string, factor float64) {
 	_length := df.NRows()
-	_swap_base := make([]float64, _length)
+	// _swap_base := make([]float64, _length)
 	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64).Values
 	_atr3 := df.Series[FindIndexOf(df, "atr3")].(*dataframe.SeriesFloat64).Values
 	_time := df.Series[FindIndexOf(df, "timestamp")].(*dataframe.SeriesTime).Values
 
-	if deep {
-		_swap_base = df.Series[FindIndexOf(df, "swap_base")].(*dataframe.SeriesFloat64).Values
-	}
+	// if deep {
+	// 	_swap_base = df.Series[FindIndexOf(df, "swap_base")].(*dataframe.SeriesFloat64).Values
+	// }
 
 	swap := make([]float64, _length)
 	swap[0] = 0
@@ -29,15 +29,17 @@ func CalcSWAPKalman(df *dataframe.DataFrame, seriesname string, source string, d
 
 	for i := 2; i < _length; i++ {
 		swap[i] = swap[i-1]
-		if deep {
-			if _swap_base[i] != swap[i-1] && swap[i] != 0 && _swap_base[i] != 0 {
-				expansion = math.Abs(_source[i]-_source[i-1]) > 0.05*_atr3[i]
-			} else {
-				expansion = math.Abs(_source[i]-_source[i-1]) > 0.3*_atr3[i]
-			}
-		} else {
-			expansion = math.Abs(_source[i]-_source[i-1]) > 0.3*_atr3[i]
-		}
+		// if deep {
+		// 	if _swap_base[i] != swap[i-1] && swap[i] != 0 && _swap_base[i] != 0 {
+		// 		expansion = math.Abs(_source[i]-_source[i-1]) > 0.05*_atr3[i]
+		// 	} else {
+		// 		expansion = math.Abs(_source[i]-_source[i-1]) > 0.3*_atr3[i]
+		// 	}
+		// } else {
+		// 	expansion = math.Abs(_source[i]-_source[i-1]) > factor*_atr3[i]
+		// }
+
+		expansion = math.Abs(_source[i]-_source[i-1]) > factor*_atr3[i]
 
 		if _source[i] > _source[i-1] && expansion {
 			swap[i] = 1
@@ -159,6 +161,8 @@ func residualVariance(source []float64, smoothed []float64) float64 {
 
 func KalmanFilter(df *dataframe.DataFrame, seriesname string, source string) {
 	length := df.NRows()
+	_timestamp := df.Series[FindIndexOf(df, "timestamp")].(*dataframe.SeriesTime).Values
+
 	if length == 0 {
 		return
 	}
@@ -167,6 +171,15 @@ func KalmanFilter(df *dataframe.DataFrame, seriesname string, source string) {
 	fftSmoothed := make([]float64, length)
 
 	for i := 0; i < length; i++ {
+
+		if _timestamp[i].Hour() >= 16 {
+			KalmanFFTWindow = 2
+			KalmanFFTCutoffDivisor = 1
+		} else {
+			KalmanFFTWindow = 64
+			KalmanFFTCutoffDivisor = 128
+		}
+
 		start := 0
 		if i+1 > KalmanFFTWindow {
 			start = i + 1 - KalmanFFTWindow

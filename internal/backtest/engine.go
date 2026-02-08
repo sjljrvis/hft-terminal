@@ -249,7 +249,7 @@ func GetBacktestStats() *BacktestStats {
 func Run() {
 	log.Println("backtest: starting")
 	startDate := "2025-01-01"
-	endDate := "2026-01-01"
+	endDate := "2026-01-25"
 	InitBacktest()
 
 	go SubscribeSignals()

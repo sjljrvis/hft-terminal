@@ -21,10 +21,10 @@ type KalmanExitConfig struct {
 func DefaultKalmanExitConfig() *KalmanExitConfig {
 	return &KalmanExitConfig{
 		ActivationMFEPts:  12,
-		MFECaptureRatio:   0.4,
+		MFECaptureRatio:   0.4, // 0.4 stable // .35 most proft d
 		SignalConfirmBars: 0,
 		EnableFixedSL:     false,
-		FixedSL:           -60,
+		FixedSL:           -50,
 	}
 }
 
@@ -276,9 +276,9 @@ func RunKalman(df *dataframe.DataFrame) {
 	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx")
 	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx")
 
-	indicators.ATR(df, "atr3", "fast_tempx_kalman", 3)
-	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 3)
+	indicators.ATR(df, "atr3", "fast_tempx_kalman", 2)
+	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 2)
 
-	indicators.CalcSWAPKalman(df, "swap", "fast_tempx_kalman", false)
-	indicators.CalcSWAPKalman(df, "swap_base", "slow_tempx_kalman", false)
+	indicators.CalcSWAPKalman(df, "swap", "fast_tempx_kalman", 0.349)      // 0.349
+	indicators.CalcSWAPKalman(df, "swap_base", "slow_tempx_kalman", 0.295) // 0.295
 }

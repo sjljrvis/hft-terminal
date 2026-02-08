@@ -1,4 +1,4 @@
-import { X, MagnifyingGlass, Download, CrosshairSimple } from "phosphor-react";
+import { X, MagnifyingGlass, Download, Crosshair } from "phosphor-react";
 
 function TradesDrawer({
   open,
@@ -164,16 +164,14 @@ function TradesDrawer({
                 const profit = trade?.profit ?? 0;
                 const profitClass = profit > 0 ? "profit-positive" : profit < 0 ? "profit-negative" : "";
                 return (
-                  <tr key={idx}>
-                    <td>
-                      <span>
-                        <CrosshairSimple size={12} weight="regular" aria-hidden="true"
+                  <tr key={idx} className="trade-entry-row">
+                    <td className="trade-entry-crosshair-container">
+                        <Crosshair size={16} weight="regular" aria-hidden="true" className="trade-entry-crosshair"
                           onClick={() => {
                             // send event to chart panel to focus on this date
                             window.dispatchEvent(new CustomEvent("onDateChange", { detail: { date: trades[0].entryTime } }));
                           }}
                         />
-                      </span>
                       {formatTime(trade?.entryTime)}
 
                     </td>

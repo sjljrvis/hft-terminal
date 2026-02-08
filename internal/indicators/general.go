@@ -46,8 +46,8 @@ func WMA(df *dataframe.DataFrame, seriesname string, source string, period int) 
 			sum += _source.Values[i-j] * weight
 			weightSum += weight
 		}
-		wma[i] = math.Round((sum/weightSum)*1000) / 1000
-		// wma[i] = math.Ceil(sum / weightSum)
+		// wma[i] = math.Round((sum/weightSum)*1000) / 1000
+		wma[i] = math.Ceil(sum / weightSum)
 	}
 
 	wma[0] = 0
