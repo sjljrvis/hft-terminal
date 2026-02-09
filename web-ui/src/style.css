@@ -87,6 +87,7 @@ button {
 }
 
 .app-header {
+  flex-shrink: 0;
   background: var(--header-bg);
   color: var(--header-text);
   padding: 16px 20px;
@@ -114,6 +115,8 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .card {
@@ -302,7 +305,7 @@ button {
 }
 
 .status-bar {
-  margin-top: auto;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -745,6 +748,7 @@ button {
 }
 
 .sidebar {
+  flex-shrink: 0;
   width: 220px;
   border-right: 1px solid var(--border-color);
   color: var(--text-color);

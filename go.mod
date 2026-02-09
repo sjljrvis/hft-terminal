@@ -3,23 +3,23 @@ module hft
 go 1.24.1
 
 require (
+	github.com/cinar/indicator v1.3.0
+	github.com/google/uuid v1.6.0
 	github.com/rocketlaunchr/dataframe-go v0.0.0-20211025052708-a1030444159b
+	github.com/samber/lo v1.52.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.37.0
 )
 
 require (
-	github.com/cinar/indicator v1.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/guptarohit/asciigraph v0.5.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.7 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/samber/lo v1.52.0 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect

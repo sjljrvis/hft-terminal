@@ -261,7 +261,7 @@ func Run() {
 		return
 	}
 
-	ticks, err := db.Ticks.ListTicksFiltered(ctx, "", "", 0, startDate, endDate) // all rows
+	ticks, err := db.Ticks.ListTicksFiltered(ctx, "nifty", "", 0, startDate, endDate) // all rows
 	if err != nil {
 		log.Printf("backtest: load ticks: %v", err)
 		return
@@ -281,6 +281,9 @@ func Run() {
 }
 
 func ToJSON() []map[string]interface{} {
+	if Instance == nil || Instance.DF == nil {
+		return []map[string]interface{}{}
+	}
 	_json := make([]map[string]interface{}, Instance.DF.NRows())
 	_data_frame := Instance.DF
 	for i := 0; i < _data_frame.NRows(); i++ {
@@ -302,6 +305,9 @@ func ToJSON() []map[string]interface{} {
 
 // TradesToJSON exports the TradeDF as a JSON-compatible slice
 func TradesToJSON() []map[string]interface{} {
+	if Instance == nil || Instance.TradeDF == nil {
+		return []map[string]interface{}{}
+	}
 	tradeDF := Instance.TradeDF
 	nRows := tradeDF.NRows()
 	_json := make([]map[string]interface{}, nRows)
@@ -325,5 +331,8 @@ func TradesToJSON() []map[string]interface{} {
 
 // GetTradeCount returns the number of trades in TradeDF
 func GetTradeCount() int {
+	if Instance == nil || Instance.TradeDF == nil {
+		return 0
+	}
 	return Instance.TradeDF.NRows()
 }

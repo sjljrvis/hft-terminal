@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -41,11 +40,11 @@ func InitDefault(dbPath string) (*DB, error) {
 			defaultErr = err
 			return
 		}
-		// Seed a sample tick row only if empty.
-		if err := store.Ticks.SeedSample(context.Background()); err != nil {
-			defaultErr = err
-			return
-		}
+		// // Seed a sample tick row only if empty.
+		// if err := store.Ticks.SeedSample(context.Background()); err != nil {
+		// 	defaultErr = err
+		// 	return
+		// }
 		defaultDB = store
 	})
 	return defaultDB, defaultErr
@@ -141,4 +140,56 @@ func nullID(id int64) any {
 		return nil
 	}
 	return id
+}
+
+// Query executes a raw SQL query and returns the results as a slice of maps.
+// Each map represents a row with column names as keys.
+func (d *DB) Query(query string) ([]map[string]interface{}, error) {
+	if d.conn == nil {
+		return nil, errors.New("database connection is nil")
+	}
+
+	rows, err := d.conn.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("execute query: %w", err)
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("get columns: %w", err)
+	}
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		// Create a slice of interface{} to hold the values
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
+		if err := rows.Scan(valuePtrs...); err != nil {
+			return nil, fmt.Errorf("scan row: %w", err)
+		}
+
+		// Convert the row to a map
+		row := make(map[string]interface{})
+		for i, col := range columns {
+			val := values[i]
+			// Convert []byte to string for better JSON encoding
+			if b, ok := val.([]byte); ok {
+				row[col] = string(b)
+			} else {
+				row[col] = val
+			}
+		}
+		results = append(results, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate rows: %w", err)
+	}
+
+	return results, nil
 }

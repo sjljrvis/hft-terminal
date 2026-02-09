@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	sqliteStore "hft/internal/storage/sqlite"
 	"hft/pkg/types"
@@ -15,6 +16,13 @@ import (
 	"time"
 )
 
+var SECURITY_LIST = map[string]string{
+	"nifty":    "256265",
+	"hindalco": "348929",
+}
+
+const AUTH_TOKEN = "JtSoS03Xlas1+UHCKYZv4IgbLvydzyZ7MfML4KEA04O5EdjE56piBHbbBHiiCf7bfaltW9pWEwrQn08YlSSNwcrclDDHsO6x8I7L6iahEPb6xnw7wJA2bQ=="
+
 type ApiResponse struct {
 	Status string `json:"status"`
 	Data   struct {
@@ -22,12 +30,12 @@ type ApiResponse struct {
 	} `json:"data"`
 }
 
-func fetchCandles(ctx context.Context, store *sqliteStore.TickStore, dateGroup map[string]string, wg *sync.WaitGroup) {
+func fetchCandles(ctx context.Context, store *sqliteStore.TickStore, dateGroup map[string]string, security string, wg *sync.WaitGroup) {
 	defer wg.Done()
+	securityID := SECURITY_LIST[security]
+	fmt.Printf("Fetching data: Start: %s, End: %s, Security: %s\n", dateGroup["start"], dateGroup["end"], security)
 
-	fmt.Printf("Fetching data: Start: %s, End: %s\n", dateGroup["start"], dateGroup["end"])
-
-	url := fmt.Sprintf("https://kite.zerodha.com/oms/instruments/historical/256265/minute?user_id=CK8434&oi=1&from=%s&to=%s", dateGroup["start"], dateGroup["end"])
+	url := fmt.Sprintf("https://kite.zerodha.com/oms/instruments/historical/%s/minute?user_id=CK8434&oi=1&from=%s&to=%s", securityID, dateGroup["start"], dateGroup["end"])
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -38,7 +46,7 @@ func fetchCandles(ctx context.Context, store *sqliteStore.TickStore, dateGroup m
 	// Set headers (copied from previous script)
 	req.Header.Set("Accept", "application/json, text/plain, */*")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9,hi;q=0.8")
-	req.Header.Set("Authorization", "enctoken DVvW65EOL3uXOyf8omISU4yj99b2Cs5/WqbTKPY8EASF6YH9Cn3iC3qQVurMPOhLjhRGp+NDx1PuOrdLz12qbVya1+rXxqmQrMPNJNfMhwKsOLKy2RzPhA==")
+	req.Header.Set("Authorization", "enctoken "+AUTH_TOKEN)
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Pragma", "no-cache")
 	req.Header.Set("Priority", "u=1, i")
@@ -97,7 +105,7 @@ func fetchCandles(ctx context.Context, store *sqliteStore.TickStore, dateGroup m
 			Close:     closeV,
 			Volume:    vol,
 			Time:      parsedTS.Unix(),
-			Symbol:    "nifty",
+			Symbol:    security,
 			TF:        "1",
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
@@ -133,6 +141,8 @@ func printGroupedDates(startDate, endDate string) []map[string]string {
 
 func main() {
 	ctx := context.Background()
+	security := flag.String("security", "nifty", "security to scrape")
+	flag.Parse()
 
 	// Open sqlite in project root
 	root, err := os.Getwd()
@@ -160,7 +170,7 @@ func main() {
 
 		go func(group map[string]string) {
 			defer func() { <-semaphore }()
-			fetchCandles(ctx, store, group, &wg)
+			fetchCandles(ctx, store, group, *security, &wg)
 		}(group)
 	}
 

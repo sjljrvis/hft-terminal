@@ -1,11 +1,10 @@
 $ vite --port "5002"
-failed to load config from /Users/sejal/Personal/hft/web-ui/vite.config.js
-error when starting dev server:
-Error: The service was stopped
-    at /Users/sejal/Personal/hft/web-ui/node_modules/esbuild/lib/main.js:968:34
-    at responseCallbacks.<computed> (/Users/sejal/Personal/hft/web-ui/node_modules/esbuild/lib/main.js:622:9)
-    at Socket.afterClose (/Users/sejal/Personal/hft/web-ui/node_modules/esbuild/lib/main.js:613:28)
-    at Socket.emit (node:events:529:35)
-    at endReadableNT (node:internal/streams/readable:1400:12)
-    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
-error: script "dev" exited with code 1
+Port 5002 is in use, trying another one...
+Port 5003 is in use, trying another one...
+Port 5004 is in use, trying another one...
+Port 5005 is in use, trying another one...
+
+  VITE v5.4.21  ready in 506 ms
+
+  ➜  Local:   http://localhost:5006/
+  ➜  Network: use --host to expose

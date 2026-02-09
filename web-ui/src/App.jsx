@@ -9,6 +9,7 @@ import LogDrawer from "./components/LogDrawer";
 import ChartPanel from "./components/ChartPanel";
 import BacktestPanel from "./components/BacktestPanel";
 import TradesDrawer from "./components/TradesDrawer";
+import DBQueryPanel from "./components/DBQueryPanel";
 import { apiBase } from "./api";
 
 // Calculate metrics from trades data
@@ -194,6 +195,7 @@ function App() {
               <Route path="/" element={<Navigate to="/chart" replace />} />
               <Route path="/chart" element={<ChartPanel setTrades={setTrades} openTradesDrawer={setOpenTradesDrawer} />} />
               <Route path="/backtest" element={<BacktestPanel />} />
+              <Route path="/query" element={<DBQueryPanel />} />
               <Route path="*" element={<DashboardCard />} />
             </Routes>
           </main>

@@ -3,12 +3,14 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
 
 	"hft/internal/backtest"
 	"hft/internal/execution"
+	"hft/internal/storage/sqlite"
 	sqliteStore "hft/internal/storage/sqlite"
 )
 
@@ -24,6 +26,7 @@ func APIHandler(mode string, dbPath string) http.Handler {
 	mux.HandleFunc("/hft/status", HFTStatusHandler)
 	mux.HandleFunc("/trades", TradesHandler)
 	mux.HandleFunc("/ticks", TicksHandler(dbPath))
+	mux.HandleFunc("/db/query", DBQueryHandler(dbPath))
 	return mux
 }
 
@@ -95,4 +98,44 @@ func getTickStore(ctx context.Context, dbPath string) (*sqliteStore.TickStore, e
 		tickStore = store
 	})
 	return tickStore, tickStoreErr
+}
+
+func DBQueryHandler(dbPath string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		enableCORS(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		query := r.URL.Query().Get("query")
+		if query == "" {
+			http.Error(w, "query parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Initialize the database with the provided path
+		db, err := sqlite.InitDefault(dbPath)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to initialize database: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		result, err := db.Query(query)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(result); err != nil {
+			http.Error(w, "failed to encode response", http.StatusInternalServerError)
+			return
+		}
+	}
 }
