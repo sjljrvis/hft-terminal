@@ -3,3 +3,9 @@
 mode: live
 api_port: 5001
 web_port: 5002
+broker:
+  - fyers:
+      app_id: 27FI60ZJ1F-100
+      app_secret: H506E7BIOR
+      redirect_uri: http://127.0.0.1:5001/broker/fyers/callback
+      pin: 1906

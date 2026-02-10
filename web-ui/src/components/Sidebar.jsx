@@ -1,36 +1,36 @@
+import { NavLink } from "react-router-dom";
 import {
-  LinkSimpleHorizontal,
-  Atom,
-  GlobeSimple,
-  GearSix,
-  ChartLine,
+  Broadcast,
   TestTube,
-  Money,
+  Database,
+  Gear,
 } from "phosphor-react";
 
 const NAV_ITEMS = [
-  { key: "Live Charts", label: "REST", icon: ChartLine },
-  { key: "Backtest", label: "GraphQL", icon: TestTube },
-  { key: "Risk Management", label: "Realtime", icon: Money },
+  { key: "live", label: "Live", icon: Broadcast, path: "/live" },
+  { key: "backtest", label: "Backtest", icon: TestTube, path: "/backtest" },
+  { key: "query", label: "Query", icon: Database, path: "/query" },
+  { key: "settings", label: "Settings", icon: Gear, path: "/settings" },
 ];
 
-function Sidebar({ collapsed, activeKey = "settings" }) {
+function Sidebar({ collapsed }) {
   return (
     <aside className={`sidebar ${collapsed ? "is-collapsed" : ""}`}>
       <nav className="sidebar__nav" aria-label="Primary">
         {NAV_ITEMS.map((item) => {
-          const isActive = item.key === activeKey;
           return (
-            <button
+            <NavLink
               key={item.key}
-              className={`sidebar__item ${isActive ? "is-active" : ""}`}
-              type="button"
+              to={item.path}
+              className={({ isActive }) =>
+                `sidebar__item ${isActive ? "is-active" : ""}`
+              }
             >
               <span className="sidebar__icon" aria-hidden="true">
                 <item.icon size={16} weight="regular" />
               </span>
               <span className="sidebar__label">{item.label}</span>
-            </button>
+            </NavLink>
           );
         })}
       </nav>

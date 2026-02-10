@@ -2,6 +2,7 @@ package backtest
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -250,6 +251,12 @@ func Run() {
 	log.Println("backtest: starting")
 	startDate := "2025-01-01"
 	endDate := "2026-01-25"
+	RunWithDates(startDate, endDate)
+}
+
+// RunWithDates executes a backtest pass with custom start and end dates.
+func RunWithDates(startDate, endDate string) error {
+	log.Printf("backtest: starting with dates %s to %s", startDate, endDate)
 	InitBacktest()
 
 	go SubscribeSignals()
@@ -258,13 +265,13 @@ func Run() {
 	db := sqlite.DefaultDB()
 	if db == nil {
 		log.Printf("backtest: db not initialized")
-		return
+		return fmt.Errorf("database not initialized")
 	}
 
 	ticks, err := db.Ticks.ListTicksFiltered(ctx, "nifty", "", 0, startDate, endDate) // all rows
 	if err != nil {
 		log.Printf("backtest: load ticks: %v", err)
-		return
+		return fmt.Errorf("failed to load ticks: %v", err)
 	}
 
 	log.Printf("backtest: loaded %d ticks", len(ticks))
@@ -278,6 +285,7 @@ func Run() {
 
 	// Give subscriber time to process final events and print summary
 	time.Sleep(100 * time.Millisecond)
+	return nil
 }
 
 func ToJSON() []map[string]interface{} {

@@ -16,6 +16,7 @@ import (
 type DB struct {
 	Ticks  *TickStore
 	Orders *OrderStore
+	Tokens *TokenStore
 	conn   *sql.DB
 }
 
@@ -102,9 +103,15 @@ func NewDB(dbPath string) (*DB, error) {
 		return nil, err
 	}
 
+	tokens := &TokenStore{db: conn}
+	if err := tokens.ensureSchema(); err != nil {
+		return nil, err
+	}
+
 	return &DB{
 		Ticks:  ticks,
 		Orders: orders,
+		Tokens: tokens,
 		conn:   conn,
 	}, nil
 }

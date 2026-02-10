@@ -6,19 +6,35 @@ import {
   ArrowsInSimple,
   MagnifyingGlass,
 } from "phosphor-react";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import {
+  selectLogsDrawerOpen,
+  selectLogSize,
+  closeLogsDrawer,
+  toggleLogSize,
+} from "../store/slices/uiSlice";
+import {
+  selectFilteredLogs,
+  selectLogsLoading,
+  selectLogsError,
+  selectLogsFilter,
+  setFilter,
+  fetchLogs,
+} from "../store/slices/logsSlice";
 
-function LogDrawer({
-  open,
-  size,
-  logs,
-  isLoading,
-  error,
-  onClose,
-  onRefresh,
-  onToggleSize,
-  filterValue,
-  onFilterChange,
-}) {
+function LogDrawer() {
+  const dispatch = useAppDispatch();
+  const open = useAppSelector(selectLogsDrawerOpen);
+  const size = useAppSelector(selectLogSize);
+  const logs = useAppSelector(selectFilteredLogs);
+  const isLoading = useAppSelector(selectLogsLoading);
+  const error = useAppSelector(selectLogsError);
+  const filterValue = useAppSelector(selectLogsFilter);
+
+  const onClose = () => dispatch(closeLogsDrawer());
+  const onRefresh = () => dispatch(fetchLogs());
+  const onToggleSize = () => dispatch(toggleLogSize());
+  const onFilterChange = (value) => dispatch(setFilter(value));
   return (
     <div
       className={`log-drawer ${open ? "is-open" : ""} ${size === "max" ? "is-max" : ""}`}

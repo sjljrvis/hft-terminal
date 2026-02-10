@@ -11,13 +11,18 @@ type User struct {
 }
 
 type Broker struct {
-	Name string
+	Name            string
+	Margin          float64
+	Equity          float64
+	FreeMargin      float64
+	UtilizedMargin  float64
+	AvailableMargin float64
 }
 
 // HFT groups user, broker, and timing metadata.
 type HFT struct {
 	User   User      // placeholder for user details
-	Broker Broker    // placeholder for broker details
+	Broker *Broker   // placeholder for broker details
 	Time   time.Time // timestamp context
 	Status string    // status of the HFT
 }

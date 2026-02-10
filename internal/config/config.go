@@ -7,13 +7,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// FyersConfig holds configuration for the Fyers broker.
+type FyersConfig struct {
+	AppID       string `yaml:"app_id"`
+	AppSecret   string `yaml:"app_secret"`
+	RedirectURI string `yaml:"redirect_uri"`
+	Pin         string `yaml:"pin"`
+}
+
+// BrokerConfig represents a single broker entry in configuration.
+type BrokerConfig struct {
+	Fyers FyersConfig `yaml:"fyers"`
+}
+
 // Config holds environment and runtime configuration.
 type Config struct {
-	Mode     string `yaml:"mode"`
-	APIPort  int    `yaml:"api_port"`
-	WebPort  int    `yaml:"web_port"`
-	DBPath   string `yaml:"db_path"`
+	Mode    string         `yaml:"mode"`
+	APIPort int            `yaml:"api_port"`
+	WebPort int            `yaml:"web_port"`
+	DBPath  string         `yaml:"db_path"`
+	Broker  []BrokerConfig `yaml:"broker"`
 }
+
+var GlobalConfig *Config
 
 // Load reads YAML config from path, applying defaults where fields are missing.
 func Load(path string) (*Config, error) {
@@ -47,5 +63,6 @@ func Load(path string) (*Config, error) {
 		cfg.DBPath = "hft.db"
 	}
 
+	GlobalConfig = cfg
 	return cfg, nil
 }

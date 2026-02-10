@@ -3,7 +3,11 @@ import axios from "axios";
 import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
 import { SlidersHorizontal, ChartLine, TestTube, GearSix, Database } from "phosphor-react";
 
-function ChartPanel({ setTrades, openTradesDrawer }) {
+import { useAppDispatch } from "../store/hooks";
+import { setTradesDrawerOpen } from "../store/slices/uiSlice";
+
+function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
+  const dispatch = useAppDispatch();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [ticks, setTicks] = useState([]);
@@ -201,10 +205,26 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
     const fetchTicks = async () => {
       setLoading(true);
       try {
-        const { data } = await axios.get("http://localhost:5001/ticks", { signal: controller.signal });
+        const { data } = await axios.get(apiEndpoint, { signal: controller.signal });
         const normalized = Array.isArray(data) ? data.map((d) => normalizeTick(d)) : [];
-        normalized.sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
-        setTicks(normalized);
+        
+        // Filter out ticks with invalid time values
+        const validTicks = normalized.filter((t) => Number.isFinite(t.time) && t.time > 0);
+        
+        // Sort by time (ascending)
+        validTicks.sort((a, b) => a.time - b.time);
+        
+        // Deduplicate by time (keep the first occurrence of each timestamp)
+        const deduplicated = [];
+        const seenTimes = new Set();
+        for (const tick of validTicks) {
+          if (!seenTimes.has(tick.time)) {
+            seenTimes.add(tick.time);
+            deduplicated.push(tick);
+          }
+        }
+        
+        setTicks(deduplicated);
         setError("");
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -216,7 +236,7 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
     };
     fetchTicks();
     return () => controller.abort();
-  }, [normalizeTick]);
+  }, [normalizeTick, apiEndpoint]);
 
   const withAlpha = useCallback((color, alpha) => {
     if (!color) return color;
@@ -523,7 +543,7 @@ function ChartPanel({ setTrades, openTradesDrawer }) {
               <SlidersHorizontal size={14} weight="regular" />
             </button>
             <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
-              <Database size={14} weight="regular" onClick={() => openTradesDrawer(true)} />
+              <Database size={14} weight="regular" onClick={() => dispatch(setTradesDrawerOpen(true))} />
             </button>
             <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
               <TestTube size={14} weight="regular" />

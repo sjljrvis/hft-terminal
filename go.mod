@@ -4,6 +4,7 @@ go 1.24.1
 
 require (
 	github.com/cinar/indicator v1.3.0
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/rocketlaunchr/dataframe-go v0.0.0-20211025052708-a1030444159b
 	github.com/samber/lo v1.52.0

@@ -1,15 +1,41 @@
 import { X, MagnifyingGlass, Download, Crosshair } from "phosphor-react";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import {
+  selectTradesDrawerOpen,
+  setTradesDrawerOpen,
+  selectActivePanel,
+} from "../store/slices/uiSlice";
+import {
+  selectFilteredSortedTrades,
+  selectFilteredSortedLiveTrades,
+  selectTradeMetrics,
+  selectLiveTradeMetrics,
+  selectTradesFilter,
+  selectTradesSort,
+  setFilter,
+  setSort,
+} from "../store/slices/tradesSlice";
 
-function TradesDrawer({
-  open,
-  onClose,
-  trades = [],
-  filterValue = "",
-  onFilterChange = () => { },
-  sortValue = "entryTime-desc",
-  onSortChange = () => { },
-  metrics = {},
-}) {
+function TradesDrawer() {
+  const dispatch = useAppDispatch();
+  const open = useAppSelector(selectTradesDrawerOpen);
+  const activePanel = useAppSelector(selectActivePanel);
+  
+  // Use live trades when on live panel, backtest trades when on backtest panel
+  const liveTrades = useAppSelector(selectFilteredSortedLiveTrades);
+  const backtestTrades = useAppSelector(selectFilteredSortedTrades);
+  const liveMetrics = useAppSelector(selectLiveTradeMetrics);
+  const backtestMetrics = useAppSelector(selectTradeMetrics);
+  
+  const trades = activePanel === 'live' ? liveTrades : backtestTrades;
+  const metrics = activePanel === 'live' ? liveMetrics : backtestMetrics;
+  
+  const filterValue = useAppSelector(selectTradesFilter);
+  const sortValue = useAppSelector(selectTradesSort);
+
+  const onClose = () => dispatch(setTradesDrawerOpen(false));
+  const onFilterChange = (value) => dispatch(setFilter(value));
+  const onSortChange = (value) => dispatch(setSort(value));
   const formatTime = (value) => {
     if (!value) return "-";
     const date = new Date(value);
@@ -169,7 +195,7 @@ function TradesDrawer({
                         <Crosshair size={16} weight="regular" aria-hidden="true" className="trade-entry-crosshair"
                           onClick={() => {
                             // send event to chart panel to focus on this date
-                            window.dispatchEvent(new CustomEvent("onDateChange", { detail: { date: trades[0].entryTime } }));
+                            window.dispatchEvent(new CustomEvent("onDateChange", { detail: { date: trade?.entryTime } }));
                           }}
                         />
                       {formatTime(trade?.entryTime)}

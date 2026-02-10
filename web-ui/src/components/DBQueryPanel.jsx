@@ -177,7 +177,7 @@ function DBQueryPanel() {
                   {results.map((row, idx) => (
                     <tr key={idx}>
                       {getColumnNames().map((col) => (
-                        <td key={col}>{formatValue(row[col])}</td>
+                        <td style={{ maxWidth: "200px" , textOverflow: "ellipsis", whiteSpace: "nowrap", overflowX: "scroll" }} key={col}>{formatValue(row[col])}</td>
                       ))}
                     </tr>
                   ))}

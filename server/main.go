@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	"hft/internal/backtest"
+	"hft/internal/brokers"
 	"hft/internal/config"
-	"hft/internal/execution"
+	"hft/internal/executor"
 	"hft/internal/storage/sqlite"
 	"hft/server/routes"
 )
@@ -31,7 +31,7 @@ func startWebserver(mode string, staticDir string, cfg *config.Config) {
 
 func main() {
 	configPath := flag.String("config", "configs/dev.yaml", "path to YAML config")
-	modeFlag := flag.String("mode", "", "override mode: live|backtest")
+	modeFlag := flag.String("mode", "", "override mode: live|dryrun")
 	staticDir := flag.String("static-dir", "web-ui/dist", "path to built web assets")
 	flag.Parse()
 
@@ -44,7 +44,7 @@ func main() {
 	if *modeFlag != "" {
 		mode = *modeFlag
 	}
-	if mode != "live" && mode != "backtest" {
+	if mode != "live" && mode != "dryrun" {
 		log.Fatalf("invalid mode %q: must be 'live' or 'backtest'", mode)
 	}
 
@@ -53,10 +53,12 @@ func main() {
 	// Initialize shared SQLite connection once (now returns *DB facade).
 	sqlite.MustInitDefault(cfg.DBPath)
 
-	backtest.Run()
+	brokers.Init()
+	loginURL := brokers.LoginURL(cfg)
+	log.Printf("login URL: %s", loginURL)
 
 	// Start executor routine.
-	exec := execution.NewExecutor(mode)
+	exec := executor.NewExecutor(mode)
 	go exec.Run()
 
 	// Start API server.
