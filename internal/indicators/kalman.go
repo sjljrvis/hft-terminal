@@ -18,10 +18,6 @@ func CalcSWAPKalman(df *dataframe.DataFrame, seriesname string, source string, f
 	_atr3 := df.Series[FindIndexOf(df, "atr3")].(*dataframe.SeriesFloat64).Values
 	_time := df.Series[FindIndexOf(df, "timestamp")].(*dataframe.SeriesTime).Values
 
-	// if deep {
-	// 	_swap_base = df.Series[FindIndexOf(df, "swap_base")].(*dataframe.SeriesFloat64).Values
-	// }
-
 	swap := make([]float64, _length)
 	swap[0] = 0
 	swap[1] = 0
@@ -29,17 +25,7 @@ func CalcSWAPKalman(df *dataframe.DataFrame, seriesname string, source string, f
 
 	for i := 2; i < _length; i++ {
 		swap[i] = swap[i-1]
-		// if deep {
-		// 	if _swap_base[i] != swap[i-1] && swap[i] != 0 && _swap_base[i] != 0 {
-		// 		expansion = math.Abs(_source[i]-_source[i-1]) > 0.05*_atr3[i]
-		// 	} else {
-		// 		expansion = math.Abs(_source[i]-_source[i-1]) > 0.3*_atr3[i]
-		// 	}
-		// } else {
-		// 	expansion = math.Abs(_source[i]-_source[i-1]) > factor*_atr3[i]
-		// }
-
-		expansion = math.Abs(_source[i]-_source[i-1]) > factor*_atr3[i]
+		expansion = false || math.Abs(_source[i]-_source[i-1]) > factor*_atr3[i]
 
 		if _source[i] > _source[i-1] && expansion {
 			swap[i] = 1
@@ -159,9 +145,9 @@ func residualVariance(source []float64, smoothed []float64) float64 {
 	return variance / float64(len(source))
 }
 
-func KalmanFilter(df *dataframe.DataFrame, seriesname string, source string) {
+func KalmanFilter(df *dataframe.DataFrame, seriesname string, source string, window int, cutoffDivisor int) {
 	length := df.NRows()
-	_timestamp := df.Series[FindIndexOf(df, "timestamp")].(*dataframe.SeriesTime).Values
+	// _timestamp := df.Series[FindIndexOf(df, "timestamp")].(*dataframe.SeriesTime).Values
 
 	if length == 0 {
 		return
@@ -172,13 +158,8 @@ func KalmanFilter(df *dataframe.DataFrame, seriesname string, source string) {
 
 	for i := 0; i < length; i++ {
 
-		if _timestamp[i].Hour() >= 16 {
-			KalmanFFTWindow = 2
-			KalmanFFTCutoffDivisor = 1
-		} else {
-			KalmanFFTWindow = 64
-			KalmanFFTCutoffDivisor = 128
-		}
+		KalmanFFTWindow = window
+		KalmanFFTCutoffDivisor = cutoffDivisor
 
 		start := 0
 		if i+1 > KalmanFFTWindow {

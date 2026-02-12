@@ -15,3 +15,8 @@ type Event struct {
 	PeakProfit float64
 	PeakLoss   float64
 }
+
+type LogEvent struct {
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+}

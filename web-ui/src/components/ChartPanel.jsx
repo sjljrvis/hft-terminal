@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
-import { SlidersHorizontal, ChartLine, TestTube, GearSix, Database } from "phosphor-react";
+import { SlidersHorizontal, ChartLine, TestTube, GearSix, Database, Ruler, X, XCircle } from "phosphor-react";
 
 import { useAppDispatch } from "../store/hooks";
 import { setTradesDrawerOpen } from "../store/slices/uiSlice";
@@ -12,12 +12,18 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
   const [loading, setLoading] = useState(true);
   const [ticks, setTicks] = useState([]);
   const [hoverValues, setHoverValues] = useState(null);
+  const [measureMode, setMeasureMode] = useState(false);
+  const [measurePoints, setMeasurePoints] = useState({ start: null, end: null });
+  const [measureHover, setMeasureHover] = useState(null); // Track hover position during measurement
+  const measureModeRef = useRef(false);
+  const measurePointsRef = useRef({ start: null, end: null });
   const chartContainerRef = useRef(null);
   const resizeObserverRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
   const lineSeriesSlowRef = useRef(null);
   const lineSeriesFastRef = useRef(null);
+  const measureLineSeriesRef = useRef(null);
   const pendingDateKeyRef = useRef(null);
 
   const toDateKey = useCallback((value) => {
@@ -199,6 +205,80 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
     return String(value);
   }, []);
 
+  const formatMeasureValue = useCallback((value, decimals = 2) => {
+    if (!Number.isFinite(value)) return "--";
+    return value.toFixed(decimals);
+  }, []);
+
+  const findTickAtTime = useCallback((timeSeconds) => {
+    return ticks.find((t) => {
+      const tTime = t.timeIst ?? t.time;
+      return Math.abs(tTime - timeSeconds) < 60; // Within 1 minute
+    });
+  }, [ticks]);
+
+  const calculateMeasureStats = useCallback((startPoint, endPoint) => {
+    if (!startPoint || !endPoint || !startPoint.time || !endPoint.time) return null;
+
+    const startTick = findTickAtTime(startPoint.time);
+    const endTick = findTickAtTime(endPoint.time);
+    
+    if (!startTick || !endTick) return null;
+
+    const startPrice = startPoint.price;
+    const endPrice = endPoint.price;
+    const priceDiff = endPrice - startPrice;
+    const priceDiffPercent = startPrice !== 0 ? (priceDiff / startPrice) * 100 : 0;
+
+    // Count bars between the two points
+    const startTime = startTick.timeIst ?? startTick.time;
+    const endTime = endTick.timeIst ?? endTick.time;
+    const timeDiff = Math.abs(endTime - startTime);
+    
+    let barCount = 0;
+    const minTime = Math.min(startTime, endTime);
+    const maxTime = Math.max(startTime, endTime);
+    for (const tick of ticks) {
+      const tTime = tick.timeIst ?? tick.time;
+      if (tTime >= minTime && tTime <= maxTime) {
+        barCount++;
+      }
+    }
+    barCount = Math.max(0, barCount - 1); // Subtract 1 to exclude the start point
+
+    // Format time difference
+    const hours = Math.floor(timeDiff / 3600);
+    const minutes = Math.floor((timeDiff % 3600) / 60);
+    const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
+    return {
+      priceDiff,
+      priceDiffPercent,
+      barCount,
+      timeDiff: timeStr,
+      startPrice,
+      endPrice,
+    };
+  }, [findTickAtTime, ticks]);
+
+  const clearMeasurement = useCallback(() => {
+    setMeasurePoints({ start: null, end: null });
+    setMeasureHover(null);
+    measurePointsRef.current = { start: null, end: null };
+    if (measureLineSeriesRef.current) {
+      measureLineSeriesRef.current.setData([]);
+    }
+  }, []);
+
+  const toggleMeasureMode = useCallback(() => {
+    const newMode = !measureModeRef.current;
+    measureModeRef.current = newMode;
+    setMeasureMode(newMode);
+    if (!newMode) {
+      clearMeasurement();
+    }
+  }, [clearMeasurement]);
+
 
   useEffect(() => {
     const controller = new AbortController();
@@ -368,16 +448,42 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
         lineWidth: 2,
         crosshairMarkerVisible: false,
       });
-      lineSeriesFastRef.current = lineFast;
+      // lineSeriesFastRef.current = lineFast;
+
+      const measureLine = chart.addSeries(LineSeries, {
+        color: colors.accent,
+        lineWidth: 2,
+        lineStyle: 1, // Dashed line style
+        crosshairMarkerVisible: true,
+        priceLineVisible: false,
+      });
+      measureLineSeriesRef.current = measureLine;
 
       const handleCrosshairMove = (param) => {
         if (!param?.time || !param?.point) {
           setHoverValues(null);
+          // Clear measure hover if crosshair leaves chart
+          if (measureModeRef.current) {
+            setMeasureHover(null);
+          }
           return;
         }
         const candleData = param.seriesData?.get?.(candles);
         const lineSlowData = param.seriesData?.get?.(lineSlow);
         const lineFastData = param.seriesData?.get?.(lineFast);
+
+        // Handle measurement mode hover preview
+        if (measureModeRef.current && measurePointsRef.current.start && !measurePointsRef.current.end) {
+          const time = candleData?.time;
+          const price = candleData?.close ?? candleData?.high ?? candleData?.low ?? candleData?.open;
+          if (Number.isFinite(time) && Number.isFinite(price)) {
+            setMeasureHover({ time, price });
+          } else {
+            setMeasureHover(null);
+          }
+        } else {
+          setMeasureHover(null);
+        }
 
         if (!candleData && !lineSlowData && !lineFastData) {
           setHoverValues(null);
@@ -399,6 +505,48 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
 
       chart.subscribeCrosshairMove(handleCrosshairMove);
 
+      const handleClick = (param) => {
+        if (!measureModeRef.current) return;
+        
+        const coord = param.point;
+        if (!coord) return;
+
+        const logicalPoint = param.seriesData?.get?.(candles);
+        if (!logicalPoint || !logicalPoint.time) return;
+
+        const time = logicalPoint.time;
+        const price = logicalPoint.close ?? logicalPoint.high ?? logicalPoint.low ?? logicalPoint.open;
+
+        if (!Number.isFinite(time) || !Number.isFinite(price)) return;
+
+        setMeasurePoints((prev) => {
+          let newState;
+          if (!prev.start) {
+            // First click - set start point
+            newState = { start: { time, price }, end: null };
+            setMeasureHover(null); // Clear any previous hover
+          } else if (!prev.end) {
+            // Second click - set end point, but check if it's the same point
+            if (prev.start.time === time) {
+              // Same point clicked twice, reset
+              newState = { start: null, end: null };
+              setMeasureHover(null);
+            } else {
+              newState = { start: prev.start, end: { time, price } };
+              setMeasureHover(null); // Clear hover when end point is set
+            }
+          } else {
+            // Third click - reset and start new measurement
+            newState = { start: { time, price }, end: null };
+            setMeasureHover(null);
+          }
+          measurePointsRef.current = newState;
+          return newState;
+        });
+      };
+
+      chart.subscribeClick(handleClick);
+
       chart.timeScale().fitContent();
       chartRef.current = chart;
       applyThemeOptions();
@@ -419,6 +567,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
       return () => {
         window.removeEventListener("resize", resize);
         chart.unsubscribeCrosshairMove(handleCrosshairMove);
+        chart.unsubscribeClick(handleClick);
         if (resizeObserverRef.current) {
           resizeObserverRef.current.disconnect();
         }
@@ -426,6 +575,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
         candleSeriesRef.current = null;
         lineSeriesSlowRef.current = null;
         lineSeriesFastRef.current = null;
+        measureLineSeriesRef.current = null;
         chart.remove();
       };
     } catch (err) {
@@ -470,12 +620,61 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
     chartRef.current?.timeScale().fitContent();
   }, [ticks]);
 
+  // Update measurement line when points change or hover
+  useEffect(() => {
+    if (!measureLineSeriesRef.current) return;
+    
+    // Determine end point: use actual end if set, otherwise use hover preview
+    const endPoint = measurePoints.end || measureHover;
+    
+    if (measurePoints.start && endPoint) {
+      // Ensure data is sorted by time (ascending order)
+      const lineData = [
+        { time: measurePoints.start.time, value: measurePoints.start.price },
+        { time: endPoint.time, value: endPoint.price },
+      ].sort((a, b) => {
+        // Sort by time, if times are equal, keep original order
+        if (a.time === b.time) {
+          return 0;
+        }
+        return a.time - b.time;
+      });
+      
+      // Only set data if we have valid, distinct points
+      if (lineData.length === 2 && lineData[0].time !== lineData[1].time) {
+        measureLineSeriesRef.current.setData(lineData);
+      } else {
+        // If same point clicked twice, clear the measurement
+        measureLineSeriesRef.current.setData([]);
+        if (measurePoints.end) {
+          setMeasurePoints({ start: null, end: null });
+        }
+      }
+    } else {
+      measureLineSeriesRef.current.setData([]);
+    }
+  }, [measurePoints, measureHover]);
+
   useEffect(() => {
     if (!pendingDateKeyRef.current) return;
     if (focusDateKey(pendingDateKeyRef.current)) {
       pendingDateKeyRef.current = null;
     }
   }, [focusDateKey, ticks]);
+
+  // Sync measureModeRef with measureMode state
+  useEffect(() => {
+    measureModeRef.current = measureMode;
+    if (!measureMode) {
+      // Clear hover when measurement mode is disabled
+      setMeasureHover(null);
+    }
+  }, [measureMode]);
+
+  // Sync measurePointsRef with measurePoints state
+  useEffect(() => {
+    measurePointsRef.current = measurePoints;
+  }, [measurePoints]);
 
   // Re-apply colors when theme class on body changes
   useEffect(() => {
@@ -506,7 +705,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
           <div className="chart-canvas">
             <div
               ref={chartContainerRef}
-              className="chart-canvas__inner"
+              className={`chart-canvas__inner ${measureMode ? 'measure-mode-active' : ''}`}
               style={{ width: "100%", height: "100%" }}
             />
             {hoverValues && (
@@ -532,6 +731,53 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
                 <span style={{ color: 'white' }}>Deviation Factor: {formatValue(hoverValues.deviationFactor)}</span>
               </div>
             )}
+            {(() => {
+              // Show overlay if we have both start and end, OR if we have start and hover preview
+              const endPoint = measurePoints.end || measureHover;
+              if (!measurePoints.start || !endPoint) return null;
+              
+              const stats = calculateMeasureStats(measurePoints.start, endPoint);
+              if (!stats) return null;
+              
+              const isPreview = !measurePoints.end && measureHover;
+              
+              return (
+                <div className="chart-measure-overlay">
+                  <div className={`chart-measure-stats ${isPreview ? 'preview' : ''}`}>
+                    {isPreview && (
+                      <div className="chart-measure-preview-label">Preview</div>
+                    )}
+                    <div className="chart-measure-row">
+                      <span className="chart-measure-label">Price:</span>
+                      <span className="chart-measure-value">{formatMeasureValue(measurePoints.start.price)} → {formatMeasureValue(endPoint.price)}</span>
+                    </div>
+                    <div className="chart-measure-row">
+                      <span className="chart-measure-label">Change:</span>
+                      <span className="chart-measure-value" style={{ color: stats.priceDiff >= 0 ? 'var(--green-candle)' : 'var(--red-candle)' }}>
+                        {formatMeasureValue(stats.priceDiff)} ({formatMeasureValue(stats.priceDiffPercent)}%)
+                      </span>
+                    </div>
+                    <div className="chart-measure-row">
+                      <span className="chart-measure-label">Bars:</span>
+                      <span className="chart-measure-value">{stats.barCount}</span>
+                    </div>
+                    <div className="chart-measure-row">
+                      <span className="chart-measure-label">Time:</span>
+                      <span className="chart-measure-value">{stats.timeDiff}</span>
+                    </div>
+                    {measurePoints.end && (
+                      <button 
+                        className="chart-measure-clear"
+                        onClick={clearMeasurement}
+                        title="Clear measurement"
+                      >
+                        <XCircle size={18} weight="regular" color="var(--accent)" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
             {/* {loading && <div className="chart-canvas__overlay muted">Loading chart…</div>}
             {error && <div className="chart-canvas__overlay error">{error}</div>} */}
           </div>
@@ -539,6 +785,15 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
 
         <aside className="chart-sidebar chart-sidebar--compact" aria-label="Chart quick actions">
           <div className="chart-sidebar__iconbar" role="toolbar" aria-orientation="vertical">
+            <button 
+              type="button" 
+              className={`chart-sidebar__iconbtn ${measureMode ? 'active' : ''}`}
+              aria-label="Measure tool"
+              onClick={toggleMeasureMode}
+              title={measureMode ? "Disable measurement tool" : "Enable measurement tool"}
+            >
+              <Ruler size={14} weight={measureMode ? "fill" : "regular"} />
+            </button>
             <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
               <SlidersHorizontal size={14} weight="regular" />
             </button>

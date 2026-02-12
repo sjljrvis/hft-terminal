@@ -15,8 +15,7 @@ export const fetchLogs = createAsyncThunk(
       const normalized = lines.map((line) => String(line));
       return normalized.slice(-200);
     } catch (error) {
-      const fallback = `[local] ${new Date().toISOString()} — backend logs unavailable`;
-      return rejectWithValue({ message: 'Unable to load logs from backend', fallback });
+      return rejectWithValue({ message: 'Unable to load logs from backend' });
     }
   }
 );
@@ -38,6 +37,10 @@ const logsSlice = createSlice({
     addFallbackLog: (state, action) => {
       state.logs = [...state.logs.slice(-180), action.payload];
     },
+    // Generic log append helper (used by WebSocket stream).
+    addLog: (state, action) => {
+      state.logs = [...state.logs.slice(-180), action.payload];
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -53,14 +56,11 @@ const logsSlice = createSlice({
       .addCase(fetchLogs.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || 'Unable to load logs from backend';
-        if (action.payload?.fallback) {
-          state.logs = [...state.logs.slice(-180), action.payload.fallback];
-        }
       });
   },
 });
 
-export const { setFilter, addFallbackLog } = logsSlice.actions;
+export const { setFilter, addFallbackLog, addLog } = logsSlice.actions;
 
 // Selectors
 export const selectLogs = (state) => state.logs.logs;

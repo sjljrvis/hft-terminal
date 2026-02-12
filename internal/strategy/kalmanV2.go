@@ -9,7 +9,7 @@ import (
 )
 
 // KalmanExitConfig holds parameters for MFE-based exits.
-type KalmanExitConfig struct {
+type KalmanExitConfigv2 struct {
 	ActivationMFEPts  float64
 	MFECaptureRatio   float64
 	SignalConfirmBars int
@@ -18,8 +18,8 @@ type KalmanExitConfig struct {
 }
 
 // DefaultKalmanExitConfig returns the default exit parameters.
-func DefaultKalmanExitConfig() *KalmanExitConfig {
-	return &KalmanExitConfig{
+func DefaultKalmanExitConfigv2() *KalmanExitConfigv2 {
+	return &KalmanExitConfigv2{
 		ActivationMFEPts:  12,
 		MFECaptureRatio:   0.4, // 0.4 stable // .35 most proft d
 		SignalConfirmBars: 0,
@@ -29,7 +29,7 @@ func DefaultKalmanExitConfig() *KalmanExitConfig {
 }
 
 // KalmanTradeState captures per-trade state for exit logic.
-type KalmanTradeState struct {
+type KalmanTradeStatev2 struct {
 	EntryPrice       float64
 	Side             string
 	CurrentPrice     float64
@@ -39,7 +39,7 @@ type KalmanTradeState struct {
 	ExitSignalStreak int
 }
 
-func (ts *KalmanTradeState) Reset() {
+func (ts *KalmanTradeStatev2) Reset() {
 	ts.EntryPrice = 0
 	ts.Side = ""
 	ts.CurrentPrice = 0
@@ -50,7 +50,7 @@ func (ts *KalmanTradeState) Reset() {
 }
 
 // shouldExit applies MFE-based, signal-confirmed exit rules.
-func shouldExit(state *KalmanTradeState, cfg *KalmanExitConfig) bool {
+func shouldExitv2(state *KalmanTradeStatev2, cfg *KalmanExitConfigv2) bool {
 	if state == nil || cfg == nil {
 		return false
 	}
@@ -112,13 +112,13 @@ RULES:
 
 */
 
-func FindKalmanSignal(df *dataframe.DataFrame, current_position *types.Position, positions []*types.Position, events chan *types.Event) {
-	FindKalmanSignalWithExitConfig(df, current_position, positions, events, DefaultKalmanExitConfig())
+func FindKalmanSignalv2(df *dataframe.DataFrame, current_position *types.Position, positions []*types.Position, events chan *types.Event) {
+	FindKalmanSignalWithExitConfigv2(df, current_position, positions, events, DefaultKalmanExitConfigv2())
 }
 
-func FindKalmanSignalWithExitConfig(df *dataframe.DataFrame, current_position *types.Position, positions []*types.Position, events chan *types.Event, exitConfig *KalmanExitConfig) {
+func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position *types.Position, positions []*types.Position, events chan *types.Event, exitConfig *KalmanExitConfigv2) {
 	if exitConfig == nil {
-		exitConfig = DefaultKalmanExitConfig()
+		exitConfig = DefaultKalmanExitConfigv2()
 	}
 	fixedSLHit := false
 
@@ -131,7 +131,7 @@ func FindKalmanSignalWithExitConfig(df *dataframe.DataFrame, current_position *t
 	_fast_swap := df.Series[indicators.FindIndexOf(df, "swap")].(*dataframe.SeriesFloat64).Values
 	// _tr := df.Series[indicators.FindIndexOf(df, "tr")].(*dataframe.SeriesFloat64).Values
 
-	tradeState := &KalmanTradeState{}
+	tradeState := &KalmanTradeStatev2{}
 
 	for i := 0; i < _dataframe_length; i++ {
 		deviation := math.Abs(_slow_tempx_kalman[i] - _fast_tempx_kalman[i])
@@ -190,7 +190,7 @@ func FindKalmanSignalWithExitConfig(df *dataframe.DataFrame, current_position *t
 			tradeState.CurrentPrice = _close[i]
 			tradeState.ExitSignal = exitSignal
 			tradeState.BarsInTrade++
-			shouldExitTrade = shouldExit(tradeState, exitConfig)
+			shouldExitTrade = shouldExitv2(tradeState, exitConfig)
 		}
 
 		shouldCloseBuy := current_position.Kind == "BUY" && (shouldExitTrade || sessionClosed)
@@ -262,7 +262,7 @@ func FindKalmanSignalWithExitConfig(df *dataframe.DataFrame, current_position *t
 	}
 }
 
-func RunKalman(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
+func RunKalmanv2(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
 	indicators.CCI(df, "fast_cci", "close", 2)
 	indicators.ATR(df, "tr", "close", 5)
 	indicators.WMA(df, "wma_tr_2", "tr", 30)
@@ -270,15 +270,15 @@ func RunKalman(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
 	indicators.CalcX(df, "fast_tempx", "close", 0.1, 2, "fast_cci", "wma_tr_2")
 	indicators.CalcX(df, "slow_tempx", "close", 0.1, 2, "fast_cci", "wma_tr_2")
 
-	indicators.EMA(df, "ema_fast_tempx", "fast_tempx", 3)  //3s
-	indicators.EMA(df, "ema_slow_tempx", "slow_tempx", 21) // 21
+	indicators.EMA(df, "ema_fast_tempx", "fast_tempx", 10) //3s
+	indicators.EMA(df, "ema_slow_tempx", "slow_tempx", 20) // 21
 
-	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 64, 128)
-	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 64, 128)
+	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 4, 8)
+	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 4, 8)
 
-	indicators.ATR(df, "atr3", "fast_tempx_kalman", 2)
-	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 2)
+	indicators.ATR(df, "atr3", "fast_tempx_kalman", 5)
+	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 5)
 
-	indicators.CalcSWAPKalman(df, "swap", "fast_tempx_kalman", 0.349)      // 0.349
-	indicators.CalcSWAPKalman(df, "swap_base", "slow_tempx_kalman", 0.295) // 0.295
+	indicators.CalcSWAPKalman(df, "swap", "fast_tempx_kalman", 0.25)      // 0.349
+	indicators.CalcSWAPKalman(df, "swap_base", "slow_tempx_kalman", 0.25) // 0.295
 }

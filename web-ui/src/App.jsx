@@ -25,7 +25,6 @@ import {
   closeLogsDrawer,
   setActivePanel,
 } from "./store/slices/uiSlice";
-import { fetchLogs } from "./store/slices/logsSlice";
 
 function AppContent() {
   const location = useLocation();
@@ -46,12 +45,7 @@ function AppContent() {
   }, [location.pathname, dispatch]);
 
   // Fetch logs when drawer opens
-  useEffect(() => {
-    if (!logsOpen) return undefined;
-    dispatch(fetchLogs());
-    const id = setInterval(() => dispatch(fetchLogs()), 4000);
-    return () => clearInterval(id);
-  }, [logsOpen, dispatch]);
+
 
   // Apply theme to body
   useEffect(() => {

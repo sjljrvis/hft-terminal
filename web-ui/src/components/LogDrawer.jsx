@@ -6,6 +6,7 @@ import {
   ArrowsInSimple,
   MagnifyingGlass,
 } from "phosphor-react";
+import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import {
   selectLogsDrawerOpen,
@@ -20,6 +21,7 @@ import {
   selectLogsFilter,
   setFilter,
   fetchLogs,
+  addLog,
 } from "../store/slices/logsSlice";
 
 function LogDrawer() {
@@ -35,6 +37,84 @@ function LogDrawer() {
   const onRefresh = () => dispatch(fetchLogs());
   const onToggleSize = () => dispatch(toggleLogSize());
   const onFilterChange = (value) => dispatch(setFilter(value));
+
+  // Stream executor/broker events to logs via WebSocket while drawer is open.
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const wsUrl = "ws://localhost:5001/ws/events";
+    let ws;
+    let closedByCleanup = false;
+
+    const formatLine = (msg) => {
+      if (!msg || typeof msg !== "object") return `[WS] : ${String(msg)}`;
+      const type = msg.type || "unknown";
+      const data = msg.data;
+      const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleString() : new Date().toLocaleString();
+      if (type === "log" && data?.message) {
+        return `${timestamp} [LOG] : ${data.message}`;
+      }
+      if (type === "event" && data) {
+        const kind = data.kind || "-";
+        const evType = data.type || "-";
+        const price = data.entryPrice ?? "-";
+        const reason = data.reason ? ` (${data.reason})` : "";
+        return `${timestamp} [EVENT] : ${evType} ${kind} @ ${price}${reason}`;
+      }
+      return `${timestamp} [${type.toUpperCase()}] : ${JSON.stringify(data ?? msg)}`;
+    };
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl);
+      const timestamp = new Date().toLocaleString();
+      dispatch(addLog(`${timestamp} [WS] : connecting to ${wsUrl}`));
+
+      ws.onopen = () => {
+        dispatch(addLog(`${timestamp} [WS] : connected`));
+      };
+
+      ws.onmessage = (evt) => {
+        const raw = String(evt.data ?? "");
+        // Server may batch messages separated by newline.
+        const frames = raw.split("\n").filter(Boolean);
+        for (const frame of frames) {
+          try {
+            const parsed = JSON.parse(frame);
+            dispatch(addLog(formatLine(parsed)));
+          } catch {
+            // Not JSON, still show.
+            dispatch(addLog(`${timestamp} [WS] : ${frame}`));
+          }
+        }
+      };
+
+      ws.onerror = () => {
+        dispatch(addLog(`${timestamp} [WS] : error`));
+      };
+
+      ws.onclose = () => {
+        dispatch(addLog(`${timestamp} [WS] : disconnected`));
+        // Simple reconnect loop while drawer is open.
+        if (!closedByCleanup) {
+          setTimeout(() => {
+            if (!closedByCleanup) connect();
+          }, 1000);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      closedByCleanup = true;
+      try {
+        ws?.close();
+      } catch {
+        // ignore
+      }
+    };
+  }, [open, dispatch]);
+
   return (
     <div
       className={`log-drawer ${open ? "is-open" : ""} ${size === "max" ? "is-max" : ""}`}

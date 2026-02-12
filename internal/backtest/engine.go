@@ -21,6 +21,7 @@ type Backtest struct {
 	Positions []*types.Position
 	Events    chan *types.Event
 	TradeDF   *_df_.DataFrame
+	LogEvents chan *types.LogEvent
 }
 
 var Instance *Backtest
@@ -49,6 +50,7 @@ func InitBacktest() {
 		DF:        dataframe.InitDataFrame(),
 		TradeDF:   dataframe.InitTradeDataFrame(),
 		Events:    make(chan *types.Event),
+		LogEvents: make(chan *types.LogEvent),
 		Positions: make([]*types.Position, 0),
 		Position: &types.Position{
 			ID:         "",
@@ -274,11 +276,12 @@ func RunWithDates(startDate, endDate string) error {
 		return fmt.Errorf("failed to load ticks: %v", err)
 	}
 
-	log.Printf("backtest: loaded %d ticks", len(ticks))
 	dataframe.LoadHistoryBacktest(df, ticks)
-	strategy.RunKalman(df)
-	strategy.FindKalmanSignal(df, Instance.Position, Instance.Positions, Instance.Events)
-	// strategy.FindSignals(df, Instance.Position, Instance.Positions, Instance.Events)
+	// strategy.RunKalman(df, Instance.LogEvents)
+	// strategy.FindKalmanSignal(df, Instance.Position, Instance.Positions, Instance.Events)
+
+	strategy.RunKalmanv2(df, Instance.LogEvents)
+	strategy.FindKalmanSignalv2(df, Instance.Position, Instance.Positions, Instance.Events)
 
 	// Close events channel to trigger summary printout
 	close(Instance.Events)

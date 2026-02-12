@@ -3,6 +3,10 @@
 mode: live
 api_port: 5001
 web_port: 5002
+clock:
+  location: Asia/Kolkata
+  start: "09:00"
+  end: "23:00"
 broker:
   - fyers:
       app_id: 27FI60ZJ1F-100

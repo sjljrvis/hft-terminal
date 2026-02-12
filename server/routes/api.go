@@ -16,7 +16,7 @@ func enableCORS(w http.ResponseWriter) {
 }
 
 // APIHandler exposes the API HTTP handler.
-func APIHandler(mode string, dbPath string) http.Handler {
+func APIHandler(mode string, dbPath string, wsHub *Hub) http.Handler {
 	mux := http.NewServeMux()
 
 	// General endpoints
@@ -25,6 +25,10 @@ func APIHandler(mode string, dbPath string) http.Handler {
 
 	mux.HandleFunc("/broker/fyers/callback", FyersLoginHandler)
 	mux.HandleFunc("/broker/fyers/margin", FyersMarginHandler) // Get margin from Fyerss
+
+	// WebSocket endpoint
+	mux.HandleFunc("/ws/events", WebSocketHandler(wsHub))
+
 	// Live endpoints
 	mux.HandleFunc("/live/ticks", LiveTicksHandler)
 	mux.HandleFunc("/live/trades", LiveTradesHandler)

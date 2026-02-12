@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"log"
 	"time"
 
 	"hft/internal/brokers"
@@ -20,6 +19,7 @@ type Executor struct {
 	Positions []*types.Position
 	Events    chan *types.Event
 	TradeDF   *_df_.DataFrame
+	LogEvents chan *types.LogEvent
 }
 
 // CurrentHFT holds the last connected HFT reference (global for quick access).
@@ -56,6 +56,7 @@ func NewExecutor(mode string) *Executor {
 		Positions: make([]*types.Position, 0),
 		Events:    make(chan *types.Event),
 		TradeDF:   dataframe.InitTradeDataFrame(),
+		LogEvents: make(chan *types.LogEvent),
 	}
 }
 
@@ -77,6 +78,7 @@ func InitExecutor() {
 		Positions: make([]*types.Position, 0),
 		Events:    make(chan *types.Event),
 		TradeDF:   dataframe.InitTradeDataFrame(),
+		LogEvents: make(chan *types.LogEvent),
 	}
 }
 
@@ -189,44 +191,13 @@ func SubscribeSignals() {
 			pendingPosition = nil
 		}
 	}
-	printExecutorSummary()
 }
 
-func printExecutorSummary() {
-	if stats == nil || stats.TotalTrades == 0 {
-		log.Println("executor: no trades executed")
-		return
+func (e *Executor) Log(message string) {
+	e.LogEvents <- &types.LogEvent{
+		Message:   message,
+		Timestamp: time.Now(),
 	}
-
-	winRate := float64(stats.WinningTrades) / float64(stats.TotalTrades) * 100
-	avgProfit := stats.NetProfit / float64(stats.TotalTrades)
-
-	var profitFactor float64
-	if stats.GrossLoss != 0 {
-		profitFactor = stats.GrossProfit / -stats.GrossLoss
-	}
-
-	log.Println("========== EXECUTOR SUMMARY ==========")
-	log.Printf("Total Trades:      %d", stats.TotalTrades)
-	log.Printf("Winning Trades:    %d (%.2f%%)", stats.WinningTrades, winRate)
-	log.Printf("Losing Trades:     %d", stats.LosingTrades)
-	log.Printf("Breakeven Trades:  %d", stats.BreakevenTrades)
-	log.Println("---------------------------------------")
-	log.Printf("Net Profit:        %.2f pts", stats.NetProfit)
-	log.Printf("Gross Profit:      %.2f pts", stats.GrossProfit)
-	log.Printf("Gross Loss:        %.2f pts", stats.GrossLoss)
-	log.Printf("Avg Profit/Trade:  %.2f pts", avgProfit)
-	log.Printf("Profit Factor:     %.2f", profitFactor)
-	log.Printf("Expectancy Ratio:  %.2f pts/trade", stats.ExpectancyRatio)
-	log.Printf("Max Drawdown:      %.2f pts", stats.MaxDrawdown)
-	log.Printf("Max Single Profit: %.2f pts", stats.MaxProfit)
-	log.Println("---------------------------------------")
-	log.Printf("Exit Reasons:")
-	log.Printf("  Profit Target:   %d", stats.ProfitTargetExits)
-	log.Printf("  Stop Loss:       %d", stats.StopLossExits)
-	log.Printf("  Trailing Stop:   %d", stats.TrailingStopExits)
-	log.Printf("  Signal:          %d", stats.SignalExits)
-	log.Println("=======================================")
 }
 
 // Run starts the executor loop. Placeholder for real order logic.
@@ -237,7 +208,7 @@ func (e *Executor) Run() {
 	to := time.Now()
 	symbol := "NSE:NIFTY50-INDEX"
 
-	log.Printf("executor routine started (mode=%s)", e.mode)
+	e.Log("executor routine started (mode=" + e.mode + ")")
 	// connect with broker
 	hftRef := &types.HFT{
 		User:   types.User{Name: "Sejal"},
@@ -246,14 +217,13 @@ func (e *Executor) Run() {
 	}
 	CurrentHFT = hftRef
 
-	log.Printf("loading history from %s to %s", from, to)
+	e.Log("loading history from " + from.String() + " to " + to.String())
 	ticks := brokers.LoadHistory(symbol, 1, from, to)
 	dataframe.LoadHistoryLive(e.DF, ticks)
-
-	log.Println("running kalman filter")
-	strategy.RunKalman(e.DF)
-	log.Println("finding kalman signal")
+	strategy.RunKalman(e.DF, e.LogEvents)
 	strategy.FindKalmanSignal(e.DF, Instance.Position, Instance.Positions, Instance.Events)
+	// strategy.RunKalmanv2(e.DF, e.LogEvents)
+	// strategy.FindKalmanSignalv2(e.DF, Instance.Position, Instance.Positions, Instance.Events)
 
 	close(Instance.Events)
 
