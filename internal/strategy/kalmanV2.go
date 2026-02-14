@@ -270,15 +270,15 @@ func RunKalmanv2(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
 	indicators.CalcX(df, "fast_tempx", "close", 0.1, 2, "fast_cci", "wma_tr_2")
 	indicators.CalcX(df, "slow_tempx", "close", 0.1, 2, "fast_cci", "wma_tr_2")
 
-	indicators.EMA(df, "ema_fast_tempx", "fast_tempx", 10) //3s
-	indicators.EMA(df, "ema_slow_tempx", "slow_tempx", 20) // 21
+	indicators.EMA(df, "ema_fast_tempx", "fast_tempx", 3) // 3
+	indicators.EMA(df, "ema_slow_tempx", "slow_tempx", 3) // 21
 
-	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 4, 8)
-	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 4, 8)
+	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 2, 2, true)
+	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 64, 128, true)
 
-	indicators.ATR(df, "atr3", "fast_tempx_kalman", 5)
-	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 5)
+	indicators.ATR(df, "atr3", "fast_tempx_kalman", 2)
+	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 2)
 
-	indicators.CalcSWAPKalman(df, "swap", "fast_tempx_kalman", 0.25)      // 0.349
-	indicators.CalcSWAPKalman(df, "swap_base", "slow_tempx_kalman", 0.25) // 0.295
+	indicators.CalcSWAPKalman(df, "swap", "fast_tempx_kalman", 0.25)     // 0.349
+	indicators.CalcSWAPKalman(df, "swap_base", "slow_tempx_kalman", 0.3) // 0.295
 }

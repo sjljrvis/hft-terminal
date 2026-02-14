@@ -220,8 +220,8 @@ func (e *Executor) Run() {
 	e.Log("loading history from " + from.String() + " to " + to.String())
 	ticks := brokers.LoadHistory(symbol, 1, from, to)
 	dataframe.LoadHistoryLive(e.DF, ticks)
-	strategy.RunKalman(e.DF, e.LogEvents)
-	strategy.FindKalmanSignal(e.DF, Instance.Position, Instance.Positions, Instance.Events)
+	strategy.RunKalmanv2(e.DF, e.LogEvents)
+	strategy.FindKalmanSignalv2(e.DF, Instance.Position, Instance.Positions, Instance.Events)
 	// strategy.RunKalmanv2(e.DF, e.LogEvents)
 	// strategy.FindKalmanSignalv2(e.DF, Instance.Position, Instance.Positions, Instance.Events)
 

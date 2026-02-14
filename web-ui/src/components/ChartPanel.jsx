@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
-import { SlidersHorizontal, ChartLine, TestTube, GearSix, Database, Ruler, X, XCircle } from "phosphor-react";
+import { SlidersHorizontal, ChartLine, TestTube, GearSix, Table, Ruler, X, XCircle } from "phosphor-react";
 
 import { useAppDispatch } from "../store/hooks";
 import { setTradesDrawerOpen } from "../store/slices/uiSlice";
@@ -798,7 +798,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
               <SlidersHorizontal size={14} weight="regular" />
             </button>
             <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
-              <Database size={14} weight="regular" onClick={() => dispatch(setTradesDrawerOpen(true))} />
+              <Table size={14} weight="regular" onClick={() => dispatch(setTradesDrawerOpen(true))} />
             </button>
             <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
               <TestTube size={14} weight="regular" />

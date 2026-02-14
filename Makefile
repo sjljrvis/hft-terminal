@@ -21,8 +21,8 @@ run-server-dev: web-ui-install web-ui-dev
 	$(GO) run . server -config configs/dev.yaml
 
 web-ui-dev: clean
-	@cd web-ui && { mkdir -p ../$(TMP_DIR); nohup $(BUN) run dev -- --port 5002 > ../$(TMP_DIR)/hft-webui-dev.log 2>&1 & echo $$! > ../$(TMP_DIR)/hft-webui-dev.pid; }
-	@echo "---> Web UI dev server started on :5002 (pid: $$(cat $(TMP_DIR)/hft-webui-dev.pid))"
+	@cd web-ui && { mkdir -p ../$(TMP_DIR); nohup $(BUN) run dev -- --host 0.0.0.0 --port 5002 > ../$(TMP_DIR)/hft-webui-dev.log 2>&1 & echo $$! > ../$(TMP_DIR)/hft-webui-dev.pid; }
+	@echo "---> Web UI dev server started on 0.0.0.0:5002 (pid: $$(cat $(TMP_DIR)/hft-webui-dev.pid))"
 
 web-ui-build:
 	cd web-ui && $(BUN) run build

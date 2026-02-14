@@ -17,7 +17,7 @@ import (
 )
 
 func startAPIserver(mode string, cfg *config.Config, wsHub *routes.Hub) {
-	addr := fmt.Sprintf(":%d", cfg.APIPort)
+	addr := fmt.Sprintf("0.0.0.0:%d", cfg.APIPort)
 	log.Printf("API listening on %s", addr)
 	if err := http.ListenAndServe(addr, routes.APIHandler(mode, cfg.DBPath, wsHub)); err != nil {
 		log.Fatalf("API server error: %v", err)
@@ -25,7 +25,7 @@ func startAPIserver(mode string, cfg *config.Config, wsHub *routes.Hub) {
 }
 
 func startWebserver(mode string, staticDir string, cfg *config.Config) {
-	addr := fmt.Sprintf(":%d", cfg.WebPort)
+	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
 	log.Printf("Webapp listening on %s (static dir: %s)", addr, staticDir)
 	if err := http.ListenAndServe(addr, routes.WebHandler(mode, staticDir)); err != nil {
 		log.Fatalf("Web server error: %v", err)

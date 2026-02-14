@@ -273,8 +273,8 @@ func RunKalman(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
 	indicators.EMA(df, "ema_fast_tempx", "fast_tempx", 3)  //3s
 	indicators.EMA(df, "ema_slow_tempx", "slow_tempx", 21) // 21
 
-	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 64, 128)
-	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 64, 128)
+	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 64, 128, false)
+	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 64, 128, false)
 
 	indicators.ATR(df, "atr3", "fast_tempx_kalman", 2)
 	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 2)

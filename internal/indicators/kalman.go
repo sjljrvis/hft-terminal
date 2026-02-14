@@ -145,7 +145,7 @@ func residualVariance(source []float64, smoothed []float64) float64 {
 	return variance / float64(len(source))
 }
 
-func KalmanFilter(df *dataframe.DataFrame, seriesname string, source string, window int, cutoffDivisor int) {
+func KalmanFilter(df *dataframe.DataFrame, seriesname string, source string, window int, cutoffDivisor int, timeEnabled bool) {
 	length := df.NRows()
 	// _timestamp := df.Series[FindIndexOf(df, "timestamp")].(*dataframe.SeriesTime).Values
 

@@ -1134,7 +1134,7 @@ button {
 .sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0px;
 }
 
 .sidebar__item {
