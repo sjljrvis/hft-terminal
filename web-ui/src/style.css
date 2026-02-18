@@ -1162,8 +1162,8 @@ button {
 
 .sidebar__item.is-active {
   color: var(--text-color);
-  border-left-color: #e92b6d;
-  background: color-mix(in srgb, var(--border-color) 25%, transparent);
+  border-left-color: var(--accent);
+  background: var(--card-bg);
 }
 
 .sidebar__icon {

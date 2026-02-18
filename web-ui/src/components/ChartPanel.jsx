@@ -448,7 +448,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
         lineWidth: 2,
         crosshairMarkerVisible: false,
       });
-      // lineSeriesFastRef.current = lineFast;
+      lineSeriesFastRef.current = lineFast;
 
       const measureLine = chart.addSeries(LineSeries, {
         color: colors.accent,
@@ -499,7 +499,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
           lineSlowColor: lineSlowData?.color,
           lineFast: lineFastData?.value,
           lineFastColor: lineFastData?.color,
-          deviationFactor: Math.abs(lineSlowData?.value - lineFastData?.value)
+          deviationFactor:  Math.round(Math.abs(lineSlowData?.value - lineFastData?.value) * 100) / 100
         });
       };
 

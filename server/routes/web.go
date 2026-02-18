@@ -14,6 +14,7 @@ func WebHandler(mode, staticDir string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Try to serve static asset; if missing, fall back to index.html; if dir missing, return placeholder.
 		if _, err := os.Stat(staticDir); err != nil {
+			fmt.Println("staticDir not found", staticDir)
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprintf(w, "webapp placeholder (mode=%s)\n", mode)
 			return
@@ -30,4 +31,3 @@ func WebHandler(mode, staticDir string) http.Handler {
 		fs.ServeHTTP(w, r)
 	})
 }
-

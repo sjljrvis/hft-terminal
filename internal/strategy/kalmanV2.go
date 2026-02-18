@@ -4,6 +4,7 @@ import (
 	"hft/internal/indicators"
 	"hft/pkg/types"
 	"math"
+	"time"
 
 	"github.com/rocketlaunchr/dataframe-go"
 )
@@ -20,7 +21,7 @@ type KalmanExitConfigv2 struct {
 // DefaultKalmanExitConfig returns the default exit parameters.
 func DefaultKalmanExitConfigv2() *KalmanExitConfigv2 {
 	return &KalmanExitConfigv2{
-		ActivationMFEPts:  12,
+		ActivationMFEPts:  500,
 		MFECaptureRatio:   0.4, // 0.4 stable // .35 most proft d
 		SignalConfirmBars: 0,
 		EnableFixedSL:     false,
@@ -116,11 +117,67 @@ func FindKalmanSignalv2(df *dataframe.DataFrame, current_position *types.Positio
 	FindKalmanSignalWithExitConfigv2(df, current_position, positions, events, DefaultKalmanExitConfigv2())
 }
 
+// isAfter915 checks if the timestamp is at or after 9:15 IST
+func isAfter915(ts *time.Time) bool {
+	if ts == nil || ts.IsZero() {
+		return false
+	}
+	ist := time.FixedZone("IST", 19800) // UTC+5:30
+	t := ts.In(ist)
+	mins := t.Hour()*60 + t.Minute()
+	return mins >= 9*60+15
+}
+
+// hasIntersected checks if fast_tempx_kalman has intersected slow_tempx_kalman between i-1 and i
+func hasIntersected(fastPrev, fastCurr, slowPrev, slowCurr float64) bool {
+	// Check if lines have crossed: sign change in (fast - slow)
+	diffPrev := fastPrev - slowPrev
+	diffCurr := fastCurr - slowCurr
+	return (diffPrev > 0 && diffCurr <= 0) || (diffPrev < 0 && diffCurr >= 0)
+}
+
+// isParallel checks if fast and slow are parallel (same direction of movement)
+func isParallel(fastPrev, fastCurr, slowPrev, slowCurr float64) bool {
+	fastDir := fastCurr - fastPrev
+	slowDir := slowCurr - slowPrev
+	// Parallel means both moving in same direction (both up or both down)
+	return (fastDir > 0 && slowDir > 0) || (fastDir < 0 && slowDir < 0)
+}
+
+// isSwapYellow checks if swap value represents "yellow" (neutral/zero)
+func isSwapYellow(swap float64) bool {
+	return swap == 0
+}
+
+// isSwapGreen checks if swap value represents "green" (bullish/positive)
+func isSwapGreen(swap float64) bool {
+	return swap == 1
+}
+
+// isSwapPink checks if swap value represents "pink" (bearish/negative)
+func isSwapPink(swap float64) bool {
+	return swap == -1
+}
+
+/*
+	RULES:
+	- first trade might be volatile most of thee time, so we need to be careful with the entry conditions
+	- fast entry - fast exit is required for first trade of the day
+	- params to track:
+	   (_fast_tempx_kalman , _slow_tempx_kalman) : check if they are parallel to each other
+	   count to maintain total number of intersections between fast and slow tempx kalman
+
+	- First trade:
+	  - Check for intersection from 9:15
+	    - If _fast_tempx_kalman interesects _slow_tempx_kalman and _slow_tempx_kalman is yellow and _fast_tempx_kalman is not yellow then wait till _slow_tempx_kalman is flipped (ignore the signal)
+	    - if _fast_tempx_kalman is parallel to _slow_tempx_kalman from market open till _fast_tempx_kalman is flipped then take the trade based on _fast_tempx_kalman color (for buy _fast_tempx_kalman should be above _slow_tempx_kalman and for sell _fast_tempx_kalman should be below _slow_tempx_kalman)
+
+-  Once first trade is over, purely  trade when _fast_tempx_kalman aligns with _slow_tempx_kalman ( color for both should be same and _fast_tempx_kalman should be above _slow_tempx_kalman for buy and _fast_tempx_kalman should be below _slow_tempx_kalman for sell)
+*/
 func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position *types.Position, positions []*types.Position, events chan *types.Event, exitConfig *KalmanExitConfigv2) {
 	if exitConfig == nil {
 		exitConfig = DefaultKalmanExitConfigv2()
 	}
-	fixedSLHit := false
 
 	_dataframe_length := df.NRows()
 	_close := df.Series[indicators.FindIndexOf(df, "close")].(*dataframe.SeriesFloat64).Values
@@ -129,41 +186,117 @@ func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position 
 	_slow_tempx_kalman := df.Series[indicators.FindIndexOf(df, "slow_tempx_kalman")].(*dataframe.SeriesFloat64).Values
 	_slow_swap := df.Series[indicators.FindIndexOf(df, "swap_base")].(*dataframe.SeriesFloat64).Values
 	_fast_swap := df.Series[indicators.FindIndexOf(df, "swap")].(*dataframe.SeriesFloat64).Values
-	// _tr := df.Series[indicators.FindIndexOf(df, "tr")].(*dataframe.SeriesFloat64).Values
 
 	tradeState := &KalmanTradeStatev2{}
 
+	// Track first trade state
+	firstTradeCompleted := false
+	firstTradeDay := -1             // Track which day we're on
+	waitingForSlowSwapFlip := false // Track if we're waiting for slow swap flip after intersection
+	parallelFromOpen := false       // Track if lines have been parallel from market open
+
 	for i := 0; i < _dataframe_length; i++ {
-		deviation := math.Abs(_slow_tempx_kalman[i] - _fast_tempx_kalman[i])
-		// normalizedDeviation := deviation / _tr[i]
-		// print only for 23 december 2025
+		// Check if we're in a new trading day
+		currentDay := _timestamp[i].YearDay()
+		if currentDay != firstTradeDay {
+			firstTradeCompleted = false
+			firstTradeDay = currentDay
+			waitingForSlowSwapFlip = false
+			parallelFromOpen = false
+		}
 
-		deviationOK := deviation >= 7 && deviation <= 15
-		// deviationOK := normalizedDeviation >= 0.5 && normalizedDeviation <= 2
-
+		// Swap flip conditions
 		slowSwapFlipUp := i > 0 && _slow_swap[i] == 1 && (_slow_swap[i-1] == 0 || _slow_swap[i-1] == -1)
 		slowSwapFlipDown := i > 0 && _slow_swap[i] == -1 && (_slow_swap[i-1] == 0 || _slow_swap[i-1] == 1)
-
 		fastSwapFlipUp := i > 0 && _fast_swap[i] == 1 && _fast_swap[i-1] == -1
 		fastSwapFlipDown := i > 0 && _fast_swap[i] == -1 && _fast_swap[i-1] == 1
-
 		slowSwapFlipSignal := i > 0 && ((_slow_swap[i-1] == 1 && _slow_swap[i] == -1) || (_slow_swap[i-1] == -1 && _slow_swap[i] == 1))
 		fastSwapFlipSignal := i > 0 && ((_fast_swap[i-1] == 1 && _fast_swap[i] == -1) || (_fast_swap[i-1] == -1 && _fast_swap[i] == 1))
 
+		// Late entry conditions
 		lateBuy := fastSwapFlipUp && _slow_swap[i] == 1
 		lateSell := fastSwapFlipDown && _slow_swap[i] == -1
-		// earlyBuy := i > 0 && _fast_swap[i] == 1 && _fast_swap[i-1] == 0
-		// earlySell := i > 0 && _fast_swap[i] == -1 && _fast_swap[i-1] == 0
 
-		_buy_condition := deviationOK && (slowSwapFlipUp || lateBuy)
-		_sell_condition := deviationOK && (slowSwapFlipDown || lateSell)
+		// Check for intersection and parallel conditions (only if we have previous data)
+		hasIntersection := false
+		isParallelNow := false
+		if i > 0 {
+			hasIntersection = hasIntersected(_fast_tempx_kalman[i-1], _fast_tempx_kalman[i],
+				_slow_tempx_kalman[i-1], _slow_tempx_kalman[i])
+			isParallelNow = isParallel(_fast_tempx_kalman[i-1], _fast_tempx_kalman[i],
+				_slow_tempx_kalman[i-1], _slow_tempx_kalman[i])
+		}
+
+		// First trade logic: check for intersection from 9:15
+		if !firstTradeCompleted && isAfter915(_timestamp[i]) {
+			if hasIntersection {
+				// If fast intersects slow and slow is yellow (0) and fast is not yellow, wait for slow flip
+				if isSwapYellow(_slow_swap[i]) && !isSwapYellow(_fast_swap[i]) {
+					waitingForSlowSwapFlip = true
+				} else {
+					waitingForSlowSwapFlip = false
+				}
+				parallelFromOpen = false
+			} else if isParallelNow {
+				// Track if parallel from market open
+				if !parallelFromOpen {
+					parallelFromOpen = true
+				}
+			} else {
+				parallelFromOpen = false
+			}
+
+			// Check if slow swap has flipped (clearing the wait condition)
+			if waitingForSlowSwapFlip && slowSwapFlipSignal {
+				waitingForSlowSwapFlip = false
+			}
+		}
+
+		// Determine buy/sell conditions based on first trade vs subsequent trades
+		var _buy_condition, _sell_condition bool
+
+		if !firstTradeCompleted {
+			// First trade logic
+			if waitingForSlowSwapFlip {
+				// Ignore signals while waiting for slow swap flip
+				_buy_condition = false
+				_sell_condition = false
+			} else if parallelFromOpen && (fastSwapFlipUp || fastSwapFlipDown) {
+				// If parallel from open and fast swap flips, take trade based on fast color
+				// For buy: fast should be above slow and fast swap should be green (1)
+				// For sell: fast should be below slow and fast swap should be pink (-1)
+				if fastSwapFlipUp && _fast_tempx_kalman[i] > _slow_tempx_kalman[i] {
+					_buy_condition = true
+					_sell_condition = false
+				} else if fastSwapFlipDown && _fast_tempx_kalman[i] < _slow_tempx_kalman[i] {
+					_sell_condition = true
+					_buy_condition = false
+				} else {
+					_buy_condition = false
+					_sell_condition = false
+				}
+			} else {
+				// Fallback to original logic for first trade
+				_buy_condition = slowSwapFlipUp || lateBuy
+				_sell_condition = slowSwapFlipDown || lateSell
+			}
+		} else {
+			// Subsequent trades: align when both swaps have same color
+			// Buy: both green (1), fast above slow
+			// Sell: both pink (-1), fast below slow
+			bothGreen := isSwapGreen(_slow_swap[i]) && isSwapGreen(_fast_swap[i])
+			bothPink := isSwapPink(_slow_swap[i]) && isSwapPink(_fast_swap[i])
+			fastAboveSlow := _fast_tempx_kalman[i] > _slow_tempx_kalman[i]
+			fastBelowSlow := _fast_tempx_kalman[i] < _slow_tempx_kalman[i]
+
+			_buy_condition = bothGreen && fastAboveSlow && (slowSwapFlipUp || lateBuy)
+			_sell_condition = bothPink && fastBelowSlow && (slowSwapFlipDown || lateSell)
+		}
 
 		sessionClosed := !indicators.IsActiveSession(_timestamp[i])
 		exitSignal := false
 
-		// update peak profit and peak loss if trade is profitable or in loss (for both buy and sell)
-		// peakprofit = max(peakprofit, current_position.Profit)
-		// peakloss = min(peakloss, current_position.Profit)
+		// Update peak profit and peak loss
 		if current_position.Kind != "" {
 			if current_position.Kind == "BUY" {
 				current_position.Profit = _close[i] - current_position.EntryPrice
@@ -175,14 +308,16 @@ func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position 
 			current_position.PeakLoss = math.Min(current_position.PeakLoss, current_position.Profit)
 		}
 
-		fixedSLHit = current_position.Profit <= exitConfig.FixedSL && exitConfig.EnableFixedSL
+		fixedSLHit := current_position.Profit <= exitConfig.FixedSL && exitConfig.EnableFixedSL
 
+		// Determine exit signal
 		if current_position.Kind == "BUY" {
 			exitSignal = _sell_condition || slowSwapFlipSignal || fastSwapFlipSignal || fixedSLHit
 		} else if current_position.Kind == "SELL" {
 			exitSignal = _buy_condition || slowSwapFlipSignal || fastSwapFlipSignal || fixedSLHit
 		}
 
+		// Check if should exit trade
 		shouldExitTrade := false
 		if current_position.Kind != "" {
 			tradeState.EntryPrice = current_position.EntryPrice
@@ -196,6 +331,7 @@ func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position 
 		shouldCloseBuy := current_position.Kind == "BUY" && (shouldExitTrade || sessionClosed)
 		shouldCloseSell := current_position.Kind == "SELL" && (shouldExitTrade || sessionClosed)
 
+		// Handle exits
 		if shouldCloseSell {
 			current_position.Exit(_close[i], *_timestamp[i])
 			exitEvent := &types.Event{
@@ -210,6 +346,9 @@ func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position 
 			current_position.Reset()
 			tradeState.Reset()
 			events <- exitEvent
+			if !firstTradeCompleted {
+				firstTradeCompleted = true
+			}
 		}
 
 		if shouldCloseBuy {
@@ -226,8 +365,12 @@ func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position 
 			current_position.Reset()
 			tradeState.Reset()
 			events <- exitEvent
+			if !firstTradeCompleted {
+				firstTradeCompleted = true
+			}
 		}
 
+		// Handle entries
 		if current_position.Kind == "" && _buy_condition {
 			current_position.Buy(_close[i], *_timestamp[i])
 			current_position.PeakProfit = 0
@@ -273,8 +416,8 @@ func RunKalmanv2(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
 	indicators.EMA(df, "ema_fast_tempx", "fast_tempx", 3) // 3
 	indicators.EMA(df, "ema_slow_tempx", "slow_tempx", 3) // 21
 
-	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 2, 2, true)
-	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 64, 128, true)
+	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 32, 32, true)
+	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 64, 64, true)
 
 	indicators.ATR(df, "atr3", "fast_tempx_kalman", 2)
 	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 2)

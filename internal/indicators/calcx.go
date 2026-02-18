@@ -98,7 +98,7 @@ func IsActiveSession(ts *time.Time) bool {
 	ist := time.FixedZone("IST", 19800) // UTC+5:30
 	t := ts.In(ist)
 	mins := t.Hour()*60 + t.Minute()
-	start := 9*60 + 17 // 09:20
+	start := 9*60 + 30 // 09:20
 	end := 15*60 + 25  // 15:20
 	return mins >= start && mins <= end
 }
