@@ -21,7 +21,7 @@ var SECURITY_LIST = map[string]string{
 	"hindalco": "348929",
 }
 
-const AUTH_TOKEN = "JtSoS03Xlas1+UHCKYZv4IgbLvydzyZ7MfML4KEA04O5EdjE56piBHbbBHiiCf7bfaltW9pWEwrQn08YlSSNwcrclDDHsO6x8I7L6iahEPb6xnw7wJA2bQ=="
+const AUTH_TOKEN = "xEwuXT7P+cD5ZsKewwMctanTCEcnpgbPPqbO4zEOaCuPM3+/Dboe9GdCmKi67s6jABYm3lfsnnWL1sb5a+dVeOWB9/cBuvTBqR/D+oqivD6F+aViqwfu7A=="
 
 type ApiResponse struct {
 	Status string `json:"status"`
@@ -156,8 +156,8 @@ func main() {
 	defer store.Close()
 
 	var wg sync.WaitGroup
-	startDate := "2015-01-01"
-	endDate := "2026-01-25"
+	startDate := "2026-03-13"
+	endDate := "2026-03-12"
 	dg := printGroupedDates(startDate, endDate)
 
 	// Limit concurrent requests

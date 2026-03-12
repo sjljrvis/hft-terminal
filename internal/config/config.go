@@ -31,12 +31,14 @@ type ClockConfig struct {
 
 // Config holds environment and runtime configuration.
 type Config struct {
-	Mode    string         `yaml:"mode"`
-	APIPort int            `yaml:"api_port"`
-	WebPort int            `yaml:"web_port"`
-	DBPath  string         `yaml:"db_path"`
-	Broker  []BrokerConfig `yaml:"broker"`
-	Clock   ClockConfig    `yaml:"clock"`
+	Mode       string         `yaml:"mode"`
+	APIPort    int            `yaml:"api_port"`
+	WebPort    int            `yaml:"web_port"`
+	DBPath     string         `yaml:"db_path"`
+	Broker     []BrokerConfig `yaml:"broker"`
+	Clock      ClockConfig    `yaml:"clock"`
+	ModelDir   string         `yaml:"model_dir"`
+	OrtLibPath string         `yaml:"ort_lib_path"` // path to libonnxruntime.dylib / .so
 }
 
 var GlobalConfig *Config
@@ -86,6 +88,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Clock.End == "" {
 		cfg.Clock.End = "15:30"
+	}
+	if cfg.ModelDir == "" {
+		cfg.ModelDir = "models/regime_model"
+	}
+	if cfg.OrtLibPath == "" {
+		cfg.OrtLibPath = "libs/onnxruntime.dylib"
 	}
 	// If Deactivate is empty, clock package will default it to End + 10 minutes.
 

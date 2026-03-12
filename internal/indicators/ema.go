@@ -12,10 +12,13 @@ func EMA(df *dataframe.DataFrame, seriesname string, source string, period int) 
 	length := df.NRows()
 	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64)
 
-	result := ta.Ema(period, _source.Values)
-	for i := 0; i < length; i++ {
-		// result[i] = math.Round(result[i]*100) / 100
-		result[i] = math.Ceil(result[i])
+	// Python: series.ewm(span=period, adjust=False).mean()
+	// alpha = 2 / (span + 1)
+	alpha := 2.0 / float64(period+1)
+	result := make([]float64, length)
+	result[0] = _source.Values[0]
+	for i := 1; i < length; i++ {
+		result[i] = alpha*_source.Values[i] + (1-alpha)*result[i-1]
 	}
 	_ema := dataframe.NewSeriesFloat64(seriesname, nil, result)
 	df.AddSeries(_ema, nil)

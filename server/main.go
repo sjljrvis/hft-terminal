@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"hft/internal/backtest"
 	"hft/internal/brokers"
 	"hft/internal/clock"
 	"hft/internal/config"
 	"hft/internal/executor"
+	"hft/internal/ml_model"
 	"hft/internal/storage/sqlite"
 	"hft/server/routes"
 )
@@ -55,6 +58,9 @@ func main() {
 
 	// Initialize shared SQLite connection once (now returns *DB facade).
 	sqlite.MustInitDefault(cfg.DBPath)
+	if err := ml_model.InitPredictor(cfg.ModelDir, cfg.OrtLibPath); err != nil {
+		log.Fatalf("ml_model init: %v", err)
+	}
 
 	brokers.Init()
 	loginURL := brokers.LoginURL(cfg)
@@ -66,6 +72,9 @@ func main() {
 	// Start event broadcaster to pipe executor events to WebSocket clients
 	routes.StartEventBroadcaster(wsHub)
 	log.Println("WebSocket event broadcaster started")
+
+	backtest.Run()
+	backtest.DownloadData()
 
 	// Start executor routine.
 	exec := executor.NewExecutor(mode)
@@ -119,7 +128,12 @@ func main() {
 	go startAPIserver(mode, cfg, wsHub)
 
 	// Start webapp server (serves static assets if present, otherwise fallback text).
-	go startWebserver(mode, *staticDir, cfg)
+	// Skip web server if static dir doesn't exist (dev mode with Vite handles frontend).
+	if _, err := os.Stat(*staticDir); err == nil {
+		go startWebserver(mode, *staticDir, cfg)
+	} else {
+		log.Printf("Skipping web server startup (static dir %s not found, assuming Vite dev server handles frontend)", *staticDir)
+	}
 
 	select {} // block forever; servers/executor run in goroutines
 }

@@ -99,3 +99,138 @@ func StandardDeviation(df *dataframe.DataFrame, seriesname string, source string
 	_standardDeviation := dataframe.NewSeriesFloat64(seriesname, nil, standardDeviation)
 	df.AddSeries(_standardDeviation, nil)
 }
+
+func Slope(df *dataframe.DataFrame, seriesname string, source string, period int) {
+	// Python: series.diff(period) / period  — non-NaN from index `period` (not period+1)
+	length := df.NRows()
+	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64).Values
+	slope := make([]float64, length)
+
+	for i := period; i < length; i++ {
+		slope[i] = (_source[i] - _source[i-period]) / float64(period)
+	}
+	_slope := dataframe.NewSeriesFloat64(seriesname, nil, slope)
+	df.AddSeries(_slope, nil)
+}
+
+func PriceDistance(df *dataframe.DataFrame, seriesname string, source string, source2 string) {
+	// python: (source - source2) / (source2 + 1e-10)  — no rounding, values are tiny (~1e-4)
+	length := df.NRows()
+	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64).Values
+	_source2 := df.Series[FindIndexOf(df, source2)].(*dataframe.SeriesFloat64).Values
+	priceDistance := make([]float64, length)
+
+	for i := 0; i < length; i++ {
+		priceDistance[i] = (_source[i] - _source2[i]) / (_source2[i] + 1e-10)
+	}
+
+	_priceDistance := dataframe.NewSeriesFloat64(seriesname, nil, priceDistance)
+	df.AddSeries(_priceDistance, nil)
+}
+
+// python:   df["log_ret"] = np.log(df["close"] / df["close"].shift(1))
+func LogReturn(df *dataframe.DataFrame, seriesname string, source string, shift int) {
+	length := df.NRows()
+	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64).Values
+	logReturn := make([]float64, length)
+
+	for i := 0; i < shift; i++ {
+		logReturn[i] = 0
+	}
+	for i := shift; i < length; i++ {
+		logReturn[i] = math.Log(_source[i] / _source[i-shift])
+	}
+	_logReturn := dataframe.NewSeriesFloat64(seriesname, nil, logReturn)
+	df.AddSeries(_logReturn, nil)
+}
+
+func CalculateRollingStd(logRet []float64, window int) []float64 {
+	n := len(logRet)
+	result := make([]float64, n)
+
+	for i := 0; i < n; i++ {
+
+		if i < window-1 {
+			result[i] = 0
+			continue
+		}
+
+		start := i - window + 1
+		sum := 0.0
+
+		for j := start; j <= i; j++ {
+			sum += logRet[j]
+		}
+
+		mean := sum / float64(window)
+
+		variance := 0.0
+		for j := start; j <= i; j++ {
+			diff := logRet[j] - mean
+			variance += diff * diff
+		}
+
+		// Python rolling().std() uses ddof=1 (sample std, divide by n-1)
+		result[i] = math.Sqrt(variance / float64(window-1))
+	}
+
+	return result
+}
+
+func RollingStd(df *dataframe.DataFrame, seriesname string, source string, period int) {
+	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64).Values
+	rollingStd := CalculateRollingStd(_source, period)
+	_rollingStd := dataframe.NewSeriesFloat64(seriesname, nil, rollingStd)
+	df.AddSeries(_rollingStd, nil)
+}
+
+// python: df["hl_range_pct"] = (df["high"] - df["low"]) / (df["close"] + 1e-10)  — no rounding
+func HLRangePct(df *dataframe.DataFrame, seriesname string) {
+	length := df.NRows()
+	_high := df.Series[FindIndexOf(df, "high")].(*dataframe.SeriesFloat64).Values
+	_low := df.Series[FindIndexOf(df, "low")].(*dataframe.SeriesFloat64).Values
+	_close := df.Series[FindIndexOf(df, "close")].(*dataframe.SeriesFloat64).Values
+	hlRangePct := make([]float64, length)
+
+	for i := 0; i < length; i++ {
+		hlRangePct[i] = (_high[i] - _low[i]) / (_close[i] + 1e-10)
+	}
+
+	_hlRangePct := dataframe.NewSeriesFloat64(seriesname, nil, hlRangePct)
+	df.AddSeries(_hlRangePct, nil)
+}
+
+func CalculateVolExpansion(rollingStd []float64, window int) []float64 {
+
+	n := len(rollingStd)
+	result := make([]float64, n)
+
+	for i := 0; i < n; i++ {
+
+		if i < window-1 {
+			result[i] = 0
+			continue
+		}
+
+		start := i - window + 1
+		sum := 0.0
+
+		for j := start; j <= i; j++ {
+			sum += rollingStd[j]
+		}
+
+		mean := sum / float64(window)
+
+		result[i] = rollingStd[i] / (mean + 1e-10)
+	}
+
+	return result
+}
+
+// python: df["vol_expansion"] = df["rolling_std"] / (df["rolling_std"].rolling(60).mean() + 1e-10)
+func VolExpansion(df *dataframe.DataFrame, seriesname string, source string, period int) {
+	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64).Values
+	volExpansion := CalculateVolExpansion(_source, period)
+	_volExpansion := dataframe.NewSeriesFloat64(seriesname, nil, volExpansion)
+	df.AddSeries(_volExpansion, nil)
+}

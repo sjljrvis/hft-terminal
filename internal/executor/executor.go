@@ -222,8 +222,9 @@ func (e *Executor) Run() {
 	dataframe.LoadHistoryLive(e.DF, ticks)
 	strategy.RunKalmanv2(e.DF, e.LogEvents)
 	strategy.FindKalmanSignalv2(e.DF, Instance.Position, Instance.Positions, Instance.Events)
-	// strategy.RunKalmanv2(e.DF, e.LogEvents)
-	// strategy.FindKalmanSignalv2(e.DF, Instance.Position, Instance.Positions, Instance.Events)
+
+	// strategy.RunKalman(e.DF, e.LogEvents)
+	// strategy.FindKalmanSignal(e.DF, Instance.Position, Instance.Positions, Instance.Events)
 
 	close(Instance.Events)
 

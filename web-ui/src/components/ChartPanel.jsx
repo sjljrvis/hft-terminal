@@ -187,12 +187,12 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
       close: Number(tick?.close) || 0,
       fast_tempx: Number.isFinite(Number(tick?.fast_tempx)) ? Number(tick?.fast_tempx) : undefined,
       slow_tempx: Number.isFinite(Number(tick?.slow_tempx)) ? Number(tick?.slow_tempx) : undefined,
-
       swap: Number.isFinite(Number(tick?.swap)) ? Number(tick?.swap) : undefined,
       swap_base: Number.isFinite(Number(tick?.swap_base)) ? Number(tick?.swap_base) : undefined,
+      regime: tick?.regime == "bullish" ? 1 : tick?.regime == "bearish" ? -1 : 0,
       timeIst: tsIst,
     };
-  }, []);
+  }, [])
 
   const swapColor = useCallback((swapVal) => {
     if (swapVal === 1) return "#00e6a8"; // cyan-green
@@ -599,7 +599,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
         .map((t) => ({
           time: t.timeIst ?? t.time,
           value: t.slow_tempx,
-          color: swapColor(t.swap_base),
+          color: swapColor(t.regime),
         }));
       if (lineData.length) {
         lineSeriesSlowRef.current.setData(lineData);

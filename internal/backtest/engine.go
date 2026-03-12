@@ -4,15 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"hft/internal/dataframe"
 	"hft/internal/indicators"
+	"hft/internal/ml_model"
 	"hft/internal/storage/sqlite"
 	"hft/internal/strategy"
 	"hft/pkg/types"
 
 	_df_ "github.com/rocketlaunchr/dataframe-go"
+	"github.com/rocketlaunchr/dataframe-go/exports"
 )
 
 type Backtest struct {
@@ -251,14 +254,29 @@ func GetBacktestStats() *BacktestStats {
 // Run executes a minimal backtest pass: load all ticks and report count.
 func Run() {
 	log.Println("backtest: starting")
-	startDate := "2025-01-01"
-	endDate := "2026-01-25"
-	RunWithDates(startDate, endDate)
+	startDate := "2022-01-01"
+	endDate := "2026-03-12"
+	RunWithDatesWarmup(startDate, endDate, "2025-12-01")
 }
 
 // RunWithDates executes a backtest pass with custom start and end dates.
+// Indicators are computed cold from startDate — use RunWithDatesWarmup to
+// avoid NaN warmup rows affecting early predictions.
 func RunWithDates(startDate, endDate string) error {
-	log.Printf("backtest: starting with dates %s to %s", startDate, endDate)
+	return RunWithDatesWarmup(startDate, endDate, "")
+}
+
+// RunWithDatesWarmup executes a backtest with a warmup period before startDate.
+// warmupFromDate should be ~2 months before startDate to fully warm rolling
+// indicators (rolling_std_60 + vol_expansion need ~120 bars; seqLen=120 more).
+// Warmup rows are loaded and processed but predictions before startDate are
+// excluded from the exported CSV and trade signals.
+func RunWithDatesWarmup(startDate, endDate, warmupFromDate string) error {
+	loadFrom := startDate
+	if warmupFromDate != "" {
+		loadFrom = warmupFromDate
+	}
+	log.Printf("backtest: loading %s→%s (warmup from %s, analysis from %s)", loadFrom, endDate, loadFrom, startDate)
 	InitBacktest()
 
 	go SubscribeSignals()
@@ -270,18 +288,25 @@ func RunWithDates(startDate, endDate string) error {
 		return fmt.Errorf("database not initialized")
 	}
 
-	ticks, err := db.Ticks.ListTicksFiltered(ctx, "nifty", "", 0, startDate, endDate) // all rows
+	ticks, err := db.Ticks.ListTicksFiltered(ctx, "nifty", "", 0, loadFrom, endDate)
 	if err != nil {
 		log.Printf("backtest: load ticks: %v", err)
 		return fmt.Errorf("failed to load ticks: %v", err)
 	}
 
 	dataframe.LoadHistoryBacktest(df, ticks)
+
 	// strategy.RunKalman(df, Instance.LogEvents)
 	// strategy.FindKalmanSignal(df, Instance.Position, Instance.Positions, Instance.Events)
 
 	strategy.RunKalmanv2(df, Instance.LogEvents)
 	strategy.FindKalmanSignalv2(df, Instance.Position, Instance.Positions, Instance.Events)
+
+	err = ml_model.PredictRegimeFromDF(df)
+	if err != nil {
+		log.Printf("backtest: predict regime: %v", err)
+		return fmt.Errorf("failed to predict regime: %v", err)
+	}
 
 	// Close events channel to trigger summary printout
 	close(Instance.Events)
@@ -295,20 +320,34 @@ func ToJSON() []map[string]interface{} {
 	if Instance == nil || Instance.DF == nil {
 		return []map[string]interface{}{}
 	}
-	_json := make([]map[string]interface{}, Instance.DF.NRows())
 	_data_frame := Instance.DF
+
+	// colVal safely retrieves series value at row i.
+	// Returns nil when the column is absent (FindIndexOf returns -1),
+	// preventing a "index out of range [-1]" panic for optional columns
+	// such as "regime" which is only present when the ML predictor is active.
+	colVal := func(name string, i int) interface{} {
+		idx := indicators.FindIndexOf(_data_frame, name)
+		if idx < 0 {
+			return nil
+		}
+		return _data_frame.Series[idx].Value(i)
+	}
+
+	_json := make([]map[string]interface{}, _data_frame.NRows())
 	for i := 0; i < _data_frame.NRows(); i++ {
 		_json[i] = map[string]interface{}{
-			"open":       _data_frame.Series[indicators.FindIndexOf(_data_frame, "open")].Value(i),
-			"high":       _data_frame.Series[indicators.FindIndexOf(_data_frame, "high")].Value(i),
-			"low":        _data_frame.Series[indicators.FindIndexOf(_data_frame, "low")].Value(i),
-			"close":      _data_frame.Series[indicators.FindIndexOf(_data_frame, "close")].Value(i),
-			"time":       _data_frame.Series[indicators.FindIndexOf(_data_frame, "time")].Value(i),
-			"timestamp":  _data_frame.Series[indicators.FindIndexOf(_data_frame, "timestamp")].Value(i),
-			"swap":       _data_frame.Series[indicators.FindIndexOf(_data_frame, "swap")].Value(i),
-			"swap_base":  _data_frame.Series[indicators.FindIndexOf(_data_frame, "swap_base")].Value(i),
-			"fast_tempx": _data_frame.Series[indicators.FindIndexOf(_data_frame, "fast_tempx_kalman")].Value(i),
-			"slow_tempx": _data_frame.Series[indicators.FindIndexOf(_data_frame, "slow_tempx_kalman")].Value(i),
+			"open":       colVal("open", i),
+			"high":       colVal("high", i),
+			"low":        colVal("low", i),
+			"close":      colVal("close", i),
+			"time":       colVal("time", i),
+			"timestamp":  colVal("timestamp", i),
+			"swap":       colVal("swap", i),
+			"swap_base":  colVal("swap_base", i),
+			"fast_tempx": colVal("fast_tempx_kalman", i),
+			"slow_tempx": colVal("slow_tempx_kalman", i),
+			"regime":     colVal("regime", i), // nil when predictor not active
 		}
 	}
 	return _json
@@ -346,4 +385,12 @@ func GetTradeCount() int {
 		return 0
 	}
 	return Instance.TradeDF.NRows()
+}
+
+func DownloadData() {
+	// Download data frame to csv
+	ctx := context.Background()
+	file, _ := os.Create("export/predicted.csv")
+	exports.ExportToCSV(ctx, file, Instance.DF)
+
 }

@@ -191,6 +191,11 @@ FROM ticks
 	}
 	if ts, ok := parseEpoch(endDate); ok {
 		conditions = append(conditions, "time <= ?")
+		// If endDate is a plain date (no time component), extend to end-of-day
+		// so ticks throughout that day are included (ticks are stored in UTC).
+		if len(endDate) == 10 {
+			ts += 86399
+		}
 		args = append(args, ts)
 	}
 	if len(conditions) > 0 {

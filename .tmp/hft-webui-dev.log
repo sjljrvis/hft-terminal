@@ -1,6 +1,6 @@
 $ vite --host "0.0.0.0" --port "5002"
 
-  VITE v5.4.21  ready in 459 ms
+  VITE v5.4.21  ready in 464 ms
 
   ➜  Local:   http://localhost:5002/
-  ➜  Network: http://192.168.0.107:5002/
+  ➜  Network: http://192.168.0.100:5002/

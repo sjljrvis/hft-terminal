@@ -7,6 +7,9 @@ clock:
   location: Asia/Kolkata
   start: "09:00"
   end: "23:00"
+
+model_dir: models
+ort_lib_path: libs/onnxruntime.dylib
 broker:
   - fyers:
       app_id: 27FI60ZJ1F-100
