@@ -41,6 +41,10 @@ func BacktestRunHandler(dbPath string) http.HandlerFunc {
 
 		// Run backtest with provided dates
 		if err := backtest.RunWithDates(request.StartDate, request.EndDate); err != nil {
+			if err.Error() == "backtest already running" {
+				http.Error(w, "backtest already running", http.StatusConflict)
+				return
+			}
 			http.Error(w, fmt.Sprintf("failed to run backtest: %v", err), http.StatusInternalServerError)
 			return
 		}

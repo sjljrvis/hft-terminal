@@ -69,8 +69,6 @@ func LoadHistoryBacktest(df *dataframe.DataFrame, data []types.Tick) {
 		panic("dataframe is nil: cannot load history data")
 	}
 	for _, tick := range data {
-		_epoch := time.Unix(tick.Time, 0)
-
 		df.Append(nil, map[string]interface{}{
 			"open":      tick.Open,
 			"high":      tick.High,
@@ -78,14 +76,13 @@ func LoadHistoryBacktest(df *dataframe.DataFrame, data []types.Tick) {
 			"close":     tick.Close,
 			"timestamp": tick.Timestamp,
 			"volume":    tick.Volume,
-			"time":      _epoch,
+			"time":      time.Unix(tick.Time, 0),
 		})
 	}
 }
 
 func LoadHistoryLive(df *dataframe.DataFrame, data []types.Tick) {
 	for _, tick := range data {
-		_epoch := time.Unix(tick.Time, 0)
 		df.Append(nil, map[string]interface{}{
 			"open":      tick.Open,
 			"high":      tick.High,
@@ -93,7 +90,7 @@ func LoadHistoryLive(df *dataframe.DataFrame, data []types.Tick) {
 			"close":     tick.Close,
 			"timestamp": tick.Timestamp,
 			"volume":    tick.Volume,
-			"time":      _epoch,
+			"time":      time.Unix(tick.Time, 0),
 		})
 	}
 }

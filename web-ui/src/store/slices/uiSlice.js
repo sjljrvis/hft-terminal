@@ -4,6 +4,7 @@ const initialState = {
   theme: 'dark',
   sidebarCollapsed: true,
   tradesDrawerOpen: false,
+  equityDrawerOpen: false,
   logsDrawerOpen: false,
   logSize: 'min', // "min" | "max"
   activePanel: 'live', // "live" | "backtest"
@@ -27,6 +28,9 @@ const uiSlice = createSlice({
     },
     toggleTradesDrawer: (state) => {
       state.tradesDrawerOpen = !state.tradesDrawerOpen;
+    },
+    toggleEquityDrawer: (state) => {
+      state.equityDrawerOpen = !state.equityDrawerOpen;
     },
     setLogsDrawerOpen: (state, action) => {
       state.logsDrawerOpen = action.payload;
@@ -56,6 +60,7 @@ export const {
   toggleSidebar,
   setTradesDrawerOpen,
   toggleTradesDrawer,
+  toggleEquityDrawer,
   setLogsDrawerOpen,
   toggleLogsDrawer,
   setLogSize,
@@ -68,6 +73,7 @@ export const {
 export const selectTheme = (state) => state.ui.theme;
 export const selectSidebarCollapsed = (state) => state.ui.sidebarCollapsed;
 export const selectTradesDrawerOpen = (state) => state.ui.tradesDrawerOpen;
+export const selectEquityDrawerOpen = (state) => state.ui.equityDrawerOpen;
 export const selectLogsDrawerOpen = (state) => state.ui.logsDrawerOpen;
 export const selectLogSize = (state) => state.ui.logSize;
 export const selectActivePanel = (state) => state.ui.activePanel;

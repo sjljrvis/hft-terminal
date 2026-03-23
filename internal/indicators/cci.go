@@ -14,7 +14,9 @@ func CCI(df *dataframe.DataFrame, seriesname string, source string, period int) 
 	for i := 0; i < length; i++ {
 		result[i] = math.Round(result[i]*100) / 100
 	}
-	result[0] = result[1]
+	if length >= 2 {
+		result[0] = result[1]
+	}
 	_cci := dataframe.NewSeriesFloat64(seriesname, nil, result)
 	df.AddSeries(_cci, nil)
 }

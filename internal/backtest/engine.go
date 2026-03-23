@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"hft/internal/dataframe"
 	"hft/internal/indicators"
-	"hft/internal/ml_model"
 	"hft/internal/storage/sqlite"
 	"hft/internal/strategy"
 	"hft/pkg/types"
@@ -28,6 +28,16 @@ type Backtest struct {
 }
 
 var Instance *Backtest
+
+// runMu prevents concurrent backtest executions from racing on the global Instance.
+var runMu sync.Mutex
+
+// IsRunning reports whether a backtest is currently in progress.
+var isRunning bool
+
+// jsonCache holds the last serialized ToJSON result so repeated /backtest/data
+// requests don't re-walk the entire DataFrame.
+var jsonCache []map[string]interface{}
 
 func Reset() {
 	Instance = &Backtest{
@@ -254,7 +264,7 @@ func GetBacktestStats() *BacktestStats {
 // Run executes a minimal backtest pass: load all ticks and report count.
 func Run() {
 	log.Println("backtest: starting")
-	startDate := "2022-01-01"
+	startDate := "2025-01-01"
 	endDate := "2026-03-12"
 	RunWithDatesWarmup(startDate, endDate, "2025-12-01")
 }
@@ -271,11 +281,33 @@ func RunWithDates(startDate, endDate string) error {
 // indicators (rolling_std_60 + vol_expansion need ~120 bars; seqLen=120 more).
 // Warmup rows are loaded and processed but predictions before startDate are
 // excluded from the exported CSV and trade signals.
+// IsRunning reports whether a backtest run is currently active.
+func IsRunning() bool {
+	runMu.Lock()
+	defer runMu.Unlock()
+	return isRunning
+}
+
 func RunWithDatesWarmup(startDate, endDate, warmupFromDate string) error {
-	loadFrom := startDate
-	if warmupFromDate != "" {
-		loadFrom = warmupFromDate
+	runMu.Lock()
+	if isRunning {
+		runMu.Unlock()
+		return fmt.Errorf("backtest already running")
 	}
+	isRunning = true
+	jsonCache = nil // invalidate stale cache
+	runMu.Unlock()
+
+	defer func() {
+		runMu.Lock()
+		isRunning = false
+		runMu.Unlock()
+	}()
+
+	loadFrom := startDate
+	// if warmupFromDate != "" {
+	// 	loadFrom = warmupFromDate
+	// }
 	log.Printf("backtest: loading %s→%s (warmup from %s, analysis from %s)", loadFrom, endDate, loadFrom, startDate)
 	InitBacktest()
 
@@ -302,53 +334,76 @@ func RunWithDatesWarmup(startDate, endDate, warmupFromDate string) error {
 	strategy.RunKalmanv2(df, Instance.LogEvents)
 	strategy.FindKalmanSignalv2(df, Instance.Position, Instance.Positions, Instance.Events)
 
-	err = ml_model.PredictRegimeFromDF(df)
-	if err != nil {
-		log.Printf("backtest: predict regime: %v", err)
-		return fmt.Errorf("failed to predict regime: %v", err)
-	}
+	// start := time.Now()
+	// err = ml_model.PredictRegimeFromDFStrided(df, 10)
+	// if err != nil {
+	// 	log.Printf("backtest: predict regime: %v", err)
+	// 	return fmt.Errorf("failed to predict regime: %v", err)
+	// }
+	// log.Printf("backtest: predict regime: %v", time.Since(start))
 
-	// Close events channel to trigger summary printout
+	// Close events channel to trigger summary printouts
 	close(Instance.Events)
 
 	// Give subscriber time to process final events and print summary
 	time.Sleep(100 * time.Millisecond)
+
+	// Pre-build and cache the JSON response so /backtest/data is instant.
+	runMu.Lock()
+	jsonCache = buildToJSON()
+	runMu.Unlock()
+
 	return nil
 }
 
 func ToJSON() []map[string]interface{} {
+	runMu.Lock()
+	cached := jsonCache
+	runMu.Unlock()
+	if cached != nil {
+		return cached
+	}
+	return buildToJSON()
+}
+
+func buildToJSON() []map[string]interface{} {
 	if Instance == nil || Instance.DF == nil {
 		return []map[string]interface{}{}
 	}
-	_data_frame := Instance.DF
+	df := Instance.DF
 
-	// colVal safely retrieves series value at row i.
-	// Returns nil when the column is absent (FindIndexOf returns -1),
-	// preventing a "index out of range [-1]" panic for optional columns
-	// such as "regime" which is only present when the ML predictor is active.
-	colVal := func(name string, i int) interface{} {
-		idx := indicators.FindIndexOf(_data_frame, name)
-		if idx < 0 {
-			return nil
-		}
-		return _data_frame.Series[idx].Value(i)
+	// Resolve series indices once — FindIndexOf is a linear scan and
+	// calling it per-row was O(N×cols×series_count), causing CPU spikes.
+	type col struct {
+		key string
+		idx int
+	}
+	cols := []col{
+		{"open", indicators.FindIndexOf(df, "open")},
+		{"high", indicators.FindIndexOf(df, "high")},
+		{"low", indicators.FindIndexOf(df, "low")},
+		{"close", indicators.FindIndexOf(df, "close")},
+		{"time", indicators.FindIndexOf(df, "time")},
+		{"timestamp", indicators.FindIndexOf(df, "timestamp")},
+		{"swap", indicators.FindIndexOf(df, "swap")},
+		{"swap_base", indicators.FindIndexOf(df, "swap_base")},
+		{"fast_tempx", indicators.FindIndexOf(df, "fast_tempx_kalman")},
+		{"slow_tempx", indicators.FindIndexOf(df, "slow_tempx_kalman")},
+		{"regime", indicators.FindIndexOf(df, "regime")},
 	}
 
-	_json := make([]map[string]interface{}, _data_frame.NRows())
-	for i := 0; i < _data_frame.NRows(); i++ {
-		_json[i] = map[string]interface{}{
-			"open":       colVal("open", i),
-			"high":       colVal("high", i),
-			"low":        colVal("low", i),
-			"close":      colVal("close", i),
-			"time":       colVal("time", i),
-			"timestamp":  colVal("timestamp", i),
-			"swap":       colVal("swap", i),
-			"swap_base":  colVal("swap_base", i),
-			"fast_tempx": colVal("fast_tempx_kalman", i),
-			"slow_tempx": colVal("slow_tempx_kalman", i),
-			"regime":     colVal("regime", i), // nil when predictor not active
+	n := df.NRows()
+	_json := make([]map[string]interface{}, n)
+	for i := 0; i < n; i++ {
+		row := make(map[string]interface{}, len(cols))
+		for _, c := range cols {
+			if c.idx < 0 {
+				row[c.key] = nil
+			} else {
+				row[c.key] = df.Series[c.idx].Value(i)
+			}
 		}
+		_json[i] = row
 	}
 	return _json
 }
@@ -358,22 +413,34 @@ func TradesToJSON() []map[string]interface{} {
 	if Instance == nil || Instance.TradeDF == nil {
 		return []map[string]interface{}{}
 	}
-	tradeDF := Instance.TradeDF
-	nRows := tradeDF.NRows()
-	_json := make([]map[string]interface{}, nRows)
+	df := Instance.TradeDF
 
-	for i := 0; i < nRows; i++ {
+	// Cache indices once before the loop.
+	idxEntry := indicators.FindIndexOf(df, "entryPrice")
+	idxExit := indicators.FindIndexOf(df, "exitPrice")
+	idxEntryTime := indicators.FindIndexOf(df, "entryTime")
+	idxExitTime := indicators.FindIndexOf(df, "exitTime")
+	idxProfit := indicators.FindIndexOf(df, "profit")
+	idxProfitPct := indicators.FindIndexOf(df, "profitPct")
+	idxType := indicators.FindIndexOf(df, "type")
+	idxPeakProfit := indicators.FindIndexOf(df, "peakProfit")
+	idxPeakLoss := indicators.FindIndexOf(df, "peakLoss")
+	idxReason := indicators.FindIndexOf(df, "reason")
+
+	n := df.NRows()
+	_json := make([]map[string]interface{}, n)
+	for i := 0; i < n; i++ {
 		_json[i] = map[string]interface{}{
-			"entryPrice": tradeDF.Series[indicators.FindIndexOf(tradeDF, "entryPrice")].Value(i),
-			"exitPrice":  tradeDF.Series[indicators.FindIndexOf(tradeDF, "exitPrice")].Value(i),
-			"entryTime":  tradeDF.Series[indicators.FindIndexOf(tradeDF, "entryTime")].Value(i),
-			"exitTime":   tradeDF.Series[indicators.FindIndexOf(tradeDF, "exitTime")].Value(i),
-			"profit":     tradeDF.Series[indicators.FindIndexOf(tradeDF, "profit")].Value(i),
-			"profitPct":  tradeDF.Series[indicators.FindIndexOf(tradeDF, "profitPct")].Value(i),
-			"type":       tradeDF.Series[indicators.FindIndexOf(tradeDF, "type")].Value(i),
-			"peakProfit": tradeDF.Series[indicators.FindIndexOf(tradeDF, "peakProfit")].Value(i),
-			"peakLoss":   tradeDF.Series[indicators.FindIndexOf(tradeDF, "peakLoss")].Value(i),
-			"reason":     tradeDF.Series[indicators.FindIndexOf(tradeDF, "reason")].Value(i),
+			"entryPrice": df.Series[idxEntry].Value(i),
+			"exitPrice":  df.Series[idxExit].Value(i),
+			"entryTime":  df.Series[idxEntryTime].Value(i),
+			"exitTime":   df.Series[idxExitTime].Value(i),
+			"profit":     df.Series[idxProfit].Value(i),
+			"profitPct":  df.Series[idxProfitPct].Value(i),
+			"type":       df.Series[idxType].Value(i),
+			"peakProfit": df.Series[idxPeakProfit].Value(i),
+			"peakLoss":   df.Series[idxPeakLoss].Value(i),
+			"reason":     df.Series[idxReason].Value(i),
 		}
 	}
 	return _json

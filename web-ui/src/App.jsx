@@ -9,19 +9,24 @@ import LogDrawer from "./components/LogDrawer";
 import ChartPanel from "./components/ChartPanel";
 import BacktestPanel from "./components/BacktestPanel";
 import LivePanel from "./components/LivePanel";
+import LiveNewPanel from "./components/LiveNewPanel";
 import TradesDrawer from "./components/TradesDrawer";
+import TickerTape from "./components/TickerTape";
 import DBQueryPanel from "./components/DBQueryPanel";
 import SettingsPanel from "./components/SettingsPanel";
+import EquityDrawer from "./components/EquityDrawer";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import {
   selectTheme,
   selectSidebarCollapsed,
   selectTradesDrawerOpen,
   selectLogsDrawerOpen,
+  selectEquityDrawerOpen,
   selectLogSize,
   setTheme,
   toggleSidebar,
   toggleLogsDrawer,
+  toggleEquityDrawer,
   closeLogsDrawer,
   setActivePanel,
 } from "./store/slices/uiSlice";
@@ -34,10 +39,11 @@ function AppContent() {
   const theme = useAppSelector(selectTheme);
   const sidebarCollapsed = useAppSelector(selectSidebarCollapsed);
   const logsOpen = useAppSelector(selectLogsDrawerOpen);
+  const equityOpen = useAppSelector(selectEquityDrawerOpen);
 
   // Set active panel based on route
   useEffect(() => {
-    if (location.pathname === '/live') {
+    if (location.pathname === '/live' || location.pathname === '/live-new') {
       dispatch(setActivePanel('live'));
     } else if (location.pathname === '/backtest') {
       dispatch(setActivePanel('backtest'));
@@ -55,13 +61,15 @@ function AppContent() {
 
   return (
     <div className="app-shell">
-      <Header theme={theme} onThemeChange={(newTheme) => dispatch(setTheme(newTheme))} />
+      <TickerTape />
+      {/* <Header theme={theme} onThemeChange={(newTheme) => dispatch(setTheme(newTheme))} />s */}
       <div className="app-body">
         <Sidebar collapsed={sidebarCollapsed} />
         <main className="app-main">
           <Routes>
             <Route path="/" element={<Navigate to="/live" replace />} />
             <Route path="/live" element={<LivePanel />} />
+            <Route path="/live-new" element={<LiveNewPanel />} />
             <Route path="/backtest" element={<BacktestPanel />} />
             <Route path="/query" element={<DBQueryPanel />} />
             <Route path="/settings" element={<SettingsPanel />} />
@@ -75,8 +83,11 @@ function AppContent() {
         onToggleSidebar={() => dispatch(toggleSidebar())}
         logsOpen={logsOpen}
         onToggleLogs={() => dispatch(toggleLogsDrawer())}
+        equityOpen={equityOpen}
+        onToggleEquity={() => dispatch(toggleEquityDrawer())}
       />
       <LogDrawer />
+      <EquityDrawer />
     </div>
   );
 }

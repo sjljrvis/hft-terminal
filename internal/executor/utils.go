@@ -30,6 +30,44 @@ func ToJSON() []map[string]interface{} {
 	return _json
 }
 
+// PositionToJSON returns the current open position (or nil if flat).
+func PositionToJSON() map[string]interface{} {
+	if Instance == nil || pendingPosition == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"kind":       pendingPosition.Kind,
+		"entryPrice": pendingPosition.EntryPrice,
+		"entryTime":  pendingPosition.EntryTime,
+		"peakProfit": pendingPosition.PeakProfit,
+		"peakLoss":   pendingPosition.PeakLoss,
+	}
+}
+
+// StatsToJSON returns the current executor statistics.
+func StatsToJSON() map[string]interface{} {
+	if stats == nil {
+		return map[string]interface{}{}
+	}
+	return map[string]interface{}{
+		"totalTrades":       stats.TotalTrades,
+		"winningTrades":     stats.WinningTrades,
+		"losingTrades":      stats.LosingTrades,
+		"breakevenTrades":   stats.BreakevenTrades,
+		"netProfit":         stats.NetProfit,
+		"grossProfit":       stats.GrossProfit,
+		"grossLoss":         stats.GrossLoss,
+		"maxDrawdown":       stats.MaxDrawdown,
+		"maxProfit":         stats.MaxProfit,
+		"peakProfit":        stats.PeakProfit,
+		"profitTargetExits": stats.ProfitTargetExits,
+		"stopLossExits":     stats.StopLossExits,
+		"trailingStopExits": stats.TrailingStopExits,
+		"signalExits":       stats.SignalExits,
+		"expectancyRatio":   stats.ExpectancyRatio,
+	}
+}
+
 func TradesToJSON() []map[string]interface{} {
 	if Instance == nil || Instance.TradeDF == nil {
 		return []map[string]interface{}{}

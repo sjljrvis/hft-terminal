@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import ChartPanel from "./ChartPanel";
+import DrawdownAlert from "./DrawdownAlert";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
-import { fetchLiveTrades, selectLiveTotalPnL } from "../store/slices/tradesSlice";
+import { fetchLiveTrades, selectLiveTotalPnL, selectLiveTrades } from "../store/slices/tradesSlice";
 
 function LivePanel() {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState("");
   const dispatch = useAppDispatch();
   const positionPnL = useAppSelector(selectLiveTotalPnL);
+  const liveTrades = useAppSelector(selectLiveTrades);
 
   // Fetch live HFT status
   useEffect(() => {
@@ -26,7 +28,7 @@ function LivePanel() {
     };
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 5000); // Poll every 5 seconds
+    const interval = setInterval(fetchStatus, 5000);
 
     return () => {
       controller.abort();
@@ -34,9 +36,11 @@ function LivePanel() {
     };
   }, []);
 
-  // Fetch live trades once on mount and store in Redux
+  // Fetch live trades and poll for updates
   useEffect(() => {
     dispatch(fetchLiveTrades());
+    const interval = setInterval(() => dispatch(fetchLiveTrades()), 5000);
+    return () => clearInterval(interval);
   }, [dispatch]);
 
   const isConnected = status?.hft?.status === "connected";
@@ -55,8 +59,8 @@ function LivePanel() {
         <p> LIVE </p>
         <div className="live-toolbar-pnl">
           <span className="live-toolbar-pnl-label">P&L:</span>
-          <span 
-            className="live-toolbar-pnl-value" 
+          <span
+            className="live-toolbar-pnl-value"
             style={{ color: pnlDisplay.color }}
           >
             {pnlDisplay.text}
@@ -76,6 +80,7 @@ function LivePanel() {
           </button>
         </div>
       </div>
+      {/* <DrawdownAlert trades={liveTrades} /> */}
       <ChartPanel apiEndpoint="http://localhost:5001/live/ticks" />
     </div>
   );

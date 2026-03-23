@@ -10,6 +10,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
   const dispatch = useAppDispatch();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [containerReady, setContainerReady] = useState(false);
   const [ticks, setTicks] = useState([]);
   const [hoverValues, setHoverValues] = useState(null);
   const [measureMode, setMeasureMode] = useState(false);
@@ -149,9 +150,9 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
       parent?.clientHeight ||
       container?.clientHeight ||
       0;
-    // Guard against momentary zero widths during layout/transition; keep a sensible min
-    const width = Math.max(1380, Math.round(actualWidth));
-    const height = Math.max(690, Math.round(actualHeight));
+    // Guard against momentary zero widths during layout/transition
+    const width = Math.max(100, Math.round(actualWidth));
+    const height = Math.max(100, Math.round(actualHeight));
     return { width, height };
   }, []);
 
@@ -400,9 +401,28 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    try {
-      const container = chartContainerRef.current;
+    const container = chartContainerRef.current;
 
+    // Wait for the container to have real dimensions before creating the chart.
+    // On initial mount inside a flex layout, dimensions may be 0.
+    const parent = container.parentElement;
+    const w = parent?.clientWidth || container.clientWidth;
+    const h = parent?.clientHeight || container.clientHeight;
+
+    if (w === 0 || h === 0) {
+      const ro = new ResizeObserver(() => {
+        const nw = parent?.clientWidth || container.clientWidth;
+        const nh = parent?.clientHeight || container.clientHeight;
+        if (nw > 0 && nh > 0) {
+          ro.disconnect();
+          setContainerReady(true);
+        }
+      });
+      ro.observe(parent || container);
+      return () => ro.disconnect();
+    }
+
+    try {
       const colors = getThemeColors();
       const chart = createChart(container, {
         ...measureDimensions(),
@@ -583,7 +603,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
       setLoading(false);
       console.error(err);
     }
-  }, [applyThemeOptions, getThemeColors, measureDimensions, resizeToContainer, withAlpha]);
+  }, [applyThemeOptions, containerReady, getThemeColors, measureDimensions, resizeToContainer, withAlpha]);
 
   // Push tick data into the candlestick series when fetched
   useEffect(() => {
@@ -795,16 +815,7 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
               <Ruler size={14} weight={measureMode ? "fill" : "regular"} />
             </button>
             <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
-              <SlidersHorizontal size={14} weight="regular" />
-            </button>
-            <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
               <Table size={14} weight="regular" onClick={() => dispatch(setTradesDrawerOpen(true))} />
-            </button>
-            <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
-              <TestTube size={14} weight="regular" />
-            </button>
-            <button type="button" className="chart-sidebar__iconbtn" aria-label="Chart action">
-              <GearSix size={14} weight="regular" />
             </button>
           </div>
         </aside>

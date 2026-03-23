@@ -19,8 +19,9 @@ func CalcSWAPKalman(df *dataframe.DataFrame, seriesname string, source string, f
 	_time := df.Series[FindIndexOf(df, "timestamp")].(*dataframe.SeriesTime).Values
 
 	swap := make([]float64, _length)
-	swap[0] = 0
-	swap[1] = 0
+	if _length >= 2 {
+		swap[1] = 0
+	}
 	expansion := false
 
 	for i := 2; i < _length; i++ {
@@ -43,6 +44,13 @@ func CalcSWAPKalman(df *dataframe.DataFrame, seriesname string, source string, f
 }
 
 func lowPassFFTLast(window []float64, cutoffDivisor int) float64 {
+	buf := make([]complex128, nextPow2(len(window)))
+	return lowPassFFTLastReuse(window, cutoffDivisor, buf)
+}
+
+// lowPassFFTLastReuse is like lowPassFFTLast but accepts a caller-provided buffer
+// to avoid a heap allocation on every call. buf must be len >= nextPow2(len(window)).
+func lowPassFFTLastReuse(window []float64, cutoffDivisor int, buf []complex128) float64 {
 	if len(window) == 0 {
 		return 0
 	}
@@ -51,12 +59,15 @@ func lowPassFFTLast(window []float64, cutoffDivisor int) float64 {
 		return window[len(window)-1]
 	}
 
-	buf := make([]complex128, n)
+	// Clear and fill only what we need — avoids make() on each call.
 	for i := 0; i < len(window); i++ {
 		buf[i] = complex(window[i], 0)
 	}
+	for i := len(window); i < n; i++ {
+		buf[i] = 0
+	}
 
-	fftInPlace(buf, false)
+	fftInPlace(buf[:n], false)
 
 	cutoff := n / cutoffDivisor
 	if cutoff < 1 {
@@ -69,7 +80,7 @@ func lowPassFFTLast(window []float64, cutoffDivisor int) float64 {
 		buf[i] = 0
 	}
 
-	fftInPlace(buf, true)
+	fftInPlace(buf[:n], true)
 	return real(buf[len(window)-1])
 }
 
@@ -156,17 +167,20 @@ func KalmanFilter(df *dataframe.DataFrame, seriesname string, source string, win
 	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64).Values
 	fftSmoothed := make([]float64, length)
 
+	KalmanFFTWindow = window
+	KalmanFFTCutoffDivisor = cutoffDivisor
+
+	// Pre-allocate the FFT buffer once for the full loop — avoids one heap
+	// allocation per row (was 97k+ allocs per KalmanFilter call).
+	fftBuf := make([]complex128, nextPow2(window))
+
 	for i := 0; i < length; i++ {
-
-		KalmanFFTWindow = window
-		KalmanFFTCutoffDivisor = cutoffDivisor
-
 		start := 0
 		if i+1 > KalmanFFTWindow {
 			start = i + 1 - KalmanFFTWindow
 		}
-		window := _source[start : i+1]
-		fftSmoothed[i] = lowPassFFTLast(window, KalmanFFTCutoffDivisor)
+		win := _source[start : i+1]
+		fftSmoothed[i] = lowPassFFTLastReuse(win, KalmanFFTCutoffDivisor, fftBuf)
 	}
 
 	r := residualVariance(_source, fftSmoothed)

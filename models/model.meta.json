@@ -1,7 +1,7 @@
 {
   "model_type": "tcn",
   "seq_len": 120,
-  "n_features": 31,
+  "n_features": 32,
   "feature_cols": [
     "fast_cci",
     "tr",
@@ -33,7 +33,8 @@
     "consec_candle_count",
     "kalman_fast_dist",
     "kalman_slow_dist",
-    "kalman_crossover"
+    "kalman_crossover",
+    "minute_of_day"
   ],
   "checkpoint_path": "/Users/apple/Work/ML/timeseries/regime-model/saved_models/best_model_state_dict.pt",
   "config_path": "/Users/apple/Work/ML/timeseries/regime-model/configs/model.yaml",

@@ -35,7 +35,7 @@ const (
 
 	// numFeatures is the number of model input features per timestep.
 	// Must match the Features struct below and meta.n_features.
-	numFeatures = 31
+	numFeatures = 32
 )
 
 // ErrNotWarmedUp is returned when the circular buffer is not yet full.
@@ -136,6 +136,9 @@ type Features struct {
 	KalmanSlowDist  float64 `json:"kalman_slow_dist"` // 30. kalman_slow_dist
 	KalmanCrossover float64 `json:"kalman_crossover"` // 31. kalman_crossover  (+1 / -1 / 0)
 
+	// ── Time context (32) ────────────────────────────────────────────────────
+	MinuteOfDay float64 `json:"minute_of_day"` // 32. minute_of_day  (0–1 over NSE session)
+
 	// ── Metadata — not fed to the model ─────────────────────────────────────
 	Timestamp time.Time
 }
@@ -155,6 +158,7 @@ func (f Features) toFloat32Row() [numFeatures]float32 {
 		f.CandleBodyRatio, f.CandleDirection, // 24-25
 		f.UpperWickRatio, f.LowerWickRatio, f.ConsecCandles, // 26-28
 		f.KalmanFastDist, f.KalmanSlowDist, f.KalmanCrossover, // 29-31
+		f.MinuteOfDay, // 32
 	}
 	var out [numFeatures]float32
 	for i, v := range raw {
@@ -479,6 +483,21 @@ func (p *Predictor) PredictRegimeFromTick(tick *types.Tick, extra Features) (Reg
 //	pred_status         string   – "invalid_features" | "buffering" | "ready"
 //	regime              string   – alias for pred_regime (backward-compat)
 func (p *Predictor) PredictRegimeFromDF(df *dataframe.DataFrame) error {
+	return p.predictRegimeFromDF(df, 1)
+}
+
+// PredictRegimeFromDFStrided is like PredictRegimeFromDF but runs inference
+// only every stride rows, carrying the last prediction forward for in-between
+// rows. stride=1 is equivalent to PredictRegimeFromDF. For backtest use
+// stride=5 gives ~5x speedup with negligible loss of regime resolution.
+func (p *Predictor) PredictRegimeFromDFStrided(df *dataframe.DataFrame, stride int) error {
+	if stride < 1 {
+		stride = 1
+	}
+	return p.predictRegimeFromDF(df, stride)
+}
+
+func (p *Predictor) predictRegimeFromDF(df *dataframe.DataFrame, stride int) error {
 	if p == nil || p.session == nil {
 		return fmt.Errorf("predictor not initialised")
 	}
@@ -541,8 +560,18 @@ func (p *Predictor) PredictRegimeFromDF(df *dataframe.DataFrame) error {
 
 	inData := p.inputTensor.GetData()
 
+	lastRawID := -1
+	var lastRawProbs [3]float32
+
 	for rowIdx := p.seqLen - 1; rowIdx < n; rowIdx++ {
 		startRow := rowIdx - p.seqLen + 1
+
+		// On strided rows, carry the last prediction forward without re-running.
+		if stride > 1 && (rowIdx-(p.seqLen-1))%stride != 0 {
+			rawIDs[rowIdx] = lastRawID
+			rawProbs[rowIdx] = lastRawProbs
+			continue
+		}
 
 		if !windowValid(startRow, rowIdx) {
 			continue
@@ -569,6 +598,8 @@ func (p *Predictor) PredictRegimeFromDF(df *dataframe.DataFrame) error {
 		logits := p.outputTensor.GetData()
 		rawIDs[rowIdx] = argmaxIdx3(logits)
 		rawProbs[rowIdx] = softmax3(logits)
+		lastRawID = rawIDs[rowIdx]
+		lastRawProbs = rawProbs[rowIdx]
 	}
 
 	// ── 5. Smoothing ──────────────────────────────────────────────────────
@@ -703,4 +734,13 @@ func PredictRegimeFromDF(df *dataframe.DataFrame) error {
 		return fmt.Errorf("predictor not initialised; call InitPredictor first")
 	}
 	return p.PredictRegimeFromDF(df)
+}
+
+// PredictRegimeFromDFStrided calls PredictRegimeFromDFStrided on the global singleton.
+func PredictRegimeFromDFStrided(df *dataframe.DataFrame, stride int) error {
+	p := GetPredictor()
+	if p == nil {
+		return fmt.Errorf("predictor not initialised; call InitPredictor first")
+	}
+	return p.PredictRegimeFromDFStrided(df, stride)
 }

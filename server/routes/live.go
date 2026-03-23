@@ -32,6 +32,41 @@ func FyersLoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Login successful"))
 }
 
+// LivePositionHandler returns the current open position.
+func LivePositionHandler(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	pos := executor.PositionToJSON()
+	if pos == nil {
+		json.NewEncoder(w).Encode(nil)
+		return
+	}
+	json.NewEncoder(w).Encode(pos)
+}
+
+// LiveStatsHandler returns executor statistics.
+func LiveStatsHandler(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(executor.StatsToJSON())
+}
+
 // LiveTicksHandler handles GET requests to return live ticks.
 func LiveTicksHandler(w http.ResponseWriter, r *http.Request) {
 	enableCORS(w)

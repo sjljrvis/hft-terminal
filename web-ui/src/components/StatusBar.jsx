@@ -1,6 +1,6 @@
-import { SidebarSimple, TerminalWindow } from "phosphor-react";
+import { SidebarSimple, TerminalWindow, ChartLine } from "phosphor-react";
 
-function StatusBar({ sidebarCollapsed, onToggleSidebar, logsOpen, onToggleLogs }) {
+function StatusBar({ sidebarCollapsed, onToggleSidebar, logsOpen, onToggleLogs, equityOpen, onToggleEquity }) {
   return (
     <footer className="status-bar" aria-label="Status bar">
       <div className="status-bar__left">
@@ -24,6 +24,15 @@ function StatusBar({ sidebarCollapsed, onToggleSidebar, logsOpen, onToggleLogs }
           aria-label="Toggle logs drawer"
         >
           <TerminalWindow size={14} weight="regular" className={logsOpen ? "status-button--active" : ""} />
+        </button>
+        <button
+          type="button"
+          className="status-bar__button"
+          onClick={onToggleEquity}
+          aria-pressed={equityOpen}
+          aria-label="Toggle equity curve"
+        >
+          <ChartLine size={14} weight="regular" className={equityOpen ? "status-button--active" : ""} />
         </button>
       </div>
       <div className="status-bar__right">

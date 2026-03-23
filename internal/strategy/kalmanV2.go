@@ -180,6 +180,11 @@ func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position 
 		exitConfig = DefaultKalmanExitConfigv2()
 	}
 
+	if df.NRows() < 2 || indicators.FindIndexOf(df, "fast_tempx_kalman") < 0 {
+		fmt.Println("FindKalmanSignalWithExitConfigv2: indicators not ready (rows=", df.NRows(), "), skipping signal generation")
+		return
+	}
+
 	_dataframe_length := df.NRows()
 	_close := df.Series[indicators.FindIndexOf(df, "close")].(*dataframe.SeriesFloat64).Values
 	_timestamp := df.Series[indicators.FindIndexOf(df, "timestamp")].(*dataframe.SeriesTime).Values
@@ -407,6 +412,11 @@ func FindKalmanSignalWithExitConfigv2(df *dataframe.DataFrame, current_position 
 }
 
 func RunKalmanv2(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
+	// All indicators need at least 2 rows; bail early if broker returned no data.
+	if df.NRows() < 2 {
+		fmt.Println("RunKalmanv2: insufficient data (rows=", df.NRows(), "), skipping indicators")
+		return
+	}
 	start := time.Now()
 	indicators.CCI(df, "fast_cci", "close", 2)
 	indicators.ATR(df, "tr", "close", 5)
@@ -415,43 +425,44 @@ func RunKalmanv2(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
 	indicators.CalcX(df, "fast_tempx", "close", 0.1, 2, "fast_cci", "wma_tr_2")
 	indicators.CalcX(df, "slow_tempx", "close", 0.1, 2, "fast_cci", "wma_tr_2")
 
-	indicators.EMA(df, "ema_fast_tempx", "fast_tempx", 3) // 3
-	indicators.EMA(df, "ema_slow_tempx", "slow_tempx", 3) // 21
+	indicators.EMA(df, "ema_fast_tempx", "fast_tempx", 9) // 3
+	indicators.EMA(df, "ema_slow_tempx", "slow_tempx", 9) // 21
 
 	indicators.KalmanFilter(df, "fast_tempx_kalman", "ema_fast_tempx", 16, 16, true)
-	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 64, 64, true)
+	indicators.KalmanFilter(df, "slow_tempx_kalman", "ema_slow_tempx", 32, 32, true)
 
 	indicators.ATR(df, "atr3", "fast_tempx_kalman", 2)
 	indicators.ATR(df, "atr3_base", "slow_tempx_kalman", 2)
 
-	indicators.CalcSWAPKalman(df, "swap", "fast_tempx_kalman", 0.2)      // 0.349
-	indicators.CalcSWAPKalman(df, "swap_base", "slow_tempx_kalman", 0.3) // 0.295
+	indicators.CalcSWAPKalman(df, "swap", "fast_tempx_kalman", 0.25)      // 0.349
+	indicators.CalcSWAPKalman(df, "swap_base", "slow_tempx_kalman", 0.25) // 0.295
 
-	// Trend indicators
-	indicators.EMA(df, "ema_fast", "close", 10)
-	indicators.EMA(df, "ema_slow", "close", 50)
-	indicators.Slope(df, "ema_slope_fast", "ema_fast", 5)
-	indicators.Slope(df, "ema_slope_slow", "ema_slow", 10)
+	// Trend indicators — reduced periods for faster trend detection
+	indicators.EMA(df, "ema_fast", "close", 5)
+	indicators.EMA(df, "ema_slow", "close", 21)
+	indicators.Slope(df, "ema_slope_fast", "ema_fast", 3)
+	indicators.Slope(df, "ema_slope_slow", "ema_slow", 5)
 	indicators.PriceDistance(df, "price_dist_ema_fast", "close", "ema_fast")
 	indicators.PriceDistance(df, "price_dist_ema_slow", "close", "ema_slow")
 	// Python: (ema_fast - ema_slow) / (ema_slow + 1e-10)
 	indicators.PriceDistance(df, "ema_crossover", "ema_fast", "ema_slow")
 
 	// Momentum indicators
-	indicators.RSI(df, "rsi", "close", 14)
-	indicators.ROC(df, "roc", "close", 10)
+	indicators.RSI(df, "rsi", "close", 7)
+	indicators.ROC(df, "roc", "close", 5)
 	indicators.LogReturn(df, "log_ret", "close", 1)
 	indicators.LogReturn(df, "log_ret_5", "close", 5)
 	indicators.LogReturn(df, "log_ret_15", "close", 15)
 	indicators.LogReturn(df, "log_ret_30", "close", 30)
 
-	// Volatility indicators — rolling mean of TR, matches Python compute_atr(period=14)
-	indicators.ATRSmoothed(df, "atr_computed", 14)
-	indicators.RollingStd(df, "rolling_std", "log_ret", 60)
-	indicators.RollingStd(df, "rolling_std_60", "log_ret", 60)
+	// Volatility indicators
+	indicators.ATRSmoothed(df, "atr_computed", 7)
+	indicators.RollingStd(df, "rolling_std", "log_ret", 21)
+	indicators.RollingStd(df, "rolling_std_60", "log_ret", 21)
 	indicators.HLRangePct(df, "hl_range_pct")
-	indicators.VolExpansion(df, "vol_expansion", "rolling_std", 60)
+	indicators.VolExpansion(df, "vol_expansion", "rolling_std", 21)
 
 	indicators.AddMicrostructureFeatures(df)
+	indicators.AddMinuteOfDay(df)
 	fmt.Println("time taken to calculate indicators", time.Since(start))
 }

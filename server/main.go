@@ -73,8 +73,10 @@ func main() {
 	routes.StartEventBroadcaster(wsHub)
 	log.Println("WebSocket event broadcaster started")
 
-	backtest.Run()
-	backtest.DownloadData()
+	go func() {
+		backtest.Run()
+		backtest.DownloadData()
+	}()
 
 	// Start executor routine.
 	exec := executor.NewExecutor(mode)

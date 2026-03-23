@@ -3,6 +3,7 @@ package indicators
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/rocketlaunchr/dataframe-go"
 )
@@ -142,4 +143,32 @@ func AddMicrostructureFeatures(df *dataframe.DataFrame) {
 	df.AddSeries(kalman_slow_dist_series, nil)
 	kalman_crossover_series := dataframe.NewSeriesFloat64("kalman_crossover", nil, kalman_crossover)
 	df.AddSeries(kalman_crossover_series, nil)
+}
+
+// AddMinuteOfDay appends a "minute_of_day" series normalized to [0, 1] over the
+// NSE session (09:15–15:30 = 375 minutes). Reads from the "timestamp" SeriesTime.
+func AddMinuteOfDay(df *dataframe.DataFrame) {
+	length := df.NRows()
+	tsIdx := FindIndexOf(df, "timestamp")
+
+	ist := time.FixedZone("IST", 5*3600+30*60)
+	minuteOfDay := make([]float64, length)
+
+	if tsIdx >= 0 {
+		_ts := df.Series[tsIdx].(*dataframe.SeriesTime).Values
+		for i := 0; i < length; i++ {
+			if _ts[i] == nil {
+				minuteOfDay[i] = 0
+				continue
+			}
+			t := _ts[i].In(ist)
+			mins := float64(t.Hour()*60+t.Minute()) - float64(9*60+15) // offset from 09:15
+			if mins < 0 {
+				mins = 0
+			}
+			minuteOfDay[i] = mins / 375.0
+		}
+	}
+
+	df.AddSeries(dataframe.NewSeriesFloat64("minute_of_day", nil, minuteOfDay), nil)
 }

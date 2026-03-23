@@ -8,11 +8,11 @@ import { Calendar } from "phosphor-react";
 function BacktestPanel() {
   const dispatch = useAppDispatch();
 
-  // Set default dates: past year to present
+  // Set default dates: past 6 months to present
   const getDefaultDates = () => {
     const today = new Date();
     const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(today.getFullYear() - 1);
+    oneYearAgo.setMonth(today.getMonth() - 6);
 
     const formatDate = (date) => {
       const year = date.getFullYear();
@@ -74,8 +74,13 @@ function BacktestPanel() {
           setError("Backtest completed but returned unexpected status");
         }
       } catch (err) {
-        console.error("Backtest error:", err);
-        setError(err.response?.data || err.message || "Failed to run backtest");
+        // 409 means server startup already triggered a run — not an error
+        if (err.response?.status === 409) {
+          console.log("Backtest already running on server, skipping duplicate run");
+        } else {
+          console.error("Backtest error:", err);
+          setError(err.response?.data || err.message || "Failed to run backtest");
+        }
       } finally {
         setIsRunning(false);
       }

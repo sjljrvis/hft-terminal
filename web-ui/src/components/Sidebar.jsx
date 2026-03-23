@@ -4,10 +4,12 @@ import {
   TestTube,
   Database,
   Gear,
+  Layout,
 } from "phosphor-react";
 
 const NAV_ITEMS = [
   { key: "live", label: "Live", icon: Broadcast, path: "/live" },
+  { key: "live-new", label: "Dashboard", icon: Layout, path: "/live-new" },
   { key: "backtest", label: "Backtest", icon: TestTube, path: "/backtest" },
   { key: "query", label: "Query", icon: Database, path: "/query" },
   { key: "settings", label: "Settings", icon: Gear, path: "/settings" },
