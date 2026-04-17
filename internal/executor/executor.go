@@ -1,10 +1,12 @@
 package executor
 
 import (
+	"log"
 	"time"
 
 	"hft/internal/brokers"
 	"hft/internal/dataframe"
+	"hft/internal/ml_model"
 	"hft/internal/strategy"
 	"hft/pkg/types"
 
@@ -56,7 +58,7 @@ func NewExecutor(mode string) *Executor {
 		Positions: make([]*types.Position, 0),
 		Events:    make(chan *types.Event),
 		TradeDF:   dataframe.InitTradeDataFrame(),
-		LogEvents: make(chan *types.LogEvent),
+		LogEvents: make(chan *types.LogEvent, 256),
 	}
 }
 
@@ -78,7 +80,7 @@ func InitExecutor() {
 		Positions: make([]*types.Position, 0),
 		Events:    make(chan *types.Event),
 		TradeDF:   dataframe.InitTradeDataFrame(),
-		LogEvents: make(chan *types.LogEvent),
+		LogEvents: make(chan *types.LogEvent, 256),
 	}
 }
 
@@ -202,8 +204,11 @@ func (e *Executor) Log(message string) {
 
 // Run starts the executor loop. Placeholder for real order logic.
 func (e *Executor) Run() {
-	go SubscribeSignals()
+	// Publish Instance before starting SubscribeSignals so the subscriber
+	// never observes a nil Instance when dereferencing Instance.Events.
 	Instance = e
+	go SubscribeSignals()
+
 	from := time.Now().AddDate(0, 0, -100)
 	to := time.Now()
 	symbol := "NSE:NIFTY50-INDEX"
@@ -216,19 +221,32 @@ func (e *Executor) Run() {
 		Time:   time.Now(),
 	}
 	CurrentHFT = hftRef
+	if hftRef.Broker == nil {
+		log.Printf("executor: broker not initialized — Fyers token may be missing/expired; log in via /broker/fyers/callback")
+	}
 
 	e.Log("loading history from " + from.String() + " to " + to.String())
 	ticks := brokers.LoadHistory(symbol, 1, from, to)
+	log.Printf("executor: loaded %d ticks for %s (%s → %s)", len(ticks), symbol, from.Format(time.RFC3339), to.Format(time.RFC3339))
+	if len(ticks) == 0 {
+		log.Printf("executor: no history loaded — skipping strategy run (check Fyers auth and date range)")
+	}
+
 	dataframe.LoadHistoryLive(e.DF, ticks)
-
 	strategy.RunKalmanv2(e.DF, e.LogEvents)
-	strategy.FindKalmanSignalv2(e.DF, Instance.Position, Instance.Positions, Instance.Events)
 
-	// strategy.RunKalman(e.DF, e.LogEvents)
-	// strategy.FindKalmanSignal(e.DF, Instance.Position, Instance.Positions, Instance.Events)
+	// Run regime model predictions (adds pred_prob_* columns to df).
+	if p := ml_model.GetPredictor(); p != nil {
+		if err := p.PredictRegimeFromDFStrided(e.DF, 1); err != nil {
+			log.Printf("executor: predict regime: %v", err)
+		}
+	} else {
+		log.Printf("executor: predictor not initialized, skipping regime predictions")
+	}
+
+	strategy.FindRegimeSignal(e.DF, Instance.Position, Instance.Positions, Instance.Events)
 
 	close(Instance.Events)
-
 	// Give subscriber time to process final events and print summary
 	time.Sleep(100 * time.Millisecond)
 	// TODO: implement live/backtest execution behavior.

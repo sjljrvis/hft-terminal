@@ -19,9 +19,10 @@ import (
 var SECURITY_LIST = map[string]string{
 	"nifty":    "256265",
 	"hindalco": "348929",
+	"reliance": "738561",
 }
 
-const AUTH_TOKEN = "xEwuXT7P+cD5ZsKewwMctanTCEcnpgbPPqbO4zEOaCuPM3+/Dboe9GdCmKi67s6jABYm3lfsnnWL1sb5a+dVeOWB9/cBuvTBqR/D+oqivD6F+aViqwfu7A=="
+const AUTH_TOKEN = "TxmUgkXTV4qD5bk0ZHOrvcUR4/6nqGKJAkf4dpFqmrRxJ+DDooWdLfNghceoOM3NrqzEr4O3SG5KdAWp3NREnsbCPVGIVeyVD9y+VQvAjKqnfm4akkcRFQ=="
 
 type ApiResponse struct {
 	Status string `json:"status"`
@@ -156,7 +157,7 @@ func main() {
 	defer store.Close()
 
 	var wg sync.WaitGroup
-	startDate := "2026-03-13"
+	startDate := "2015-01-01"
 	endDate := "2026-03-12"
 	dg := printGroupedDates(startDate, endDate)
 

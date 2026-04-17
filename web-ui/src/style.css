@@ -1,18 +1,18 @@
 @import url("https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@100&display=swap");
 
 :root {
-  --bg-color: #0c0d0f;
+  --bg-color: #141414;
   --text-color: #d3d3d3;
   --text-color-1: #aeaeae;
   --muted-color: #9ca3af;
-  --card-bg: #0f1115;
-  --border-color: #1f2937;
-  --header-bg: #0c0d0f;
+  --card-bg: #202020;
+  --border-color: #141414;
+  --header-bg: #141414;
   --header-text: #e5e7eb;
   --shadow-color: rgba(0, 0, 0, 0.4);
   --accent: #22c55e;
   --light-grey: #404040;
-  --border-color-light: rgba(0, 0, 0, 0.25);
+  --border-color-light: rgba(0, 0, 0, 1);
   font-family: "Google Sans Code", monospace;
   font-weight: 100;
   --red-candle: #ef4444;
@@ -20,13 +20,13 @@
 }
 
 .theme-light {
-  --bg-color: #ffffff;
+  --bg-color: #f7f7f7;
   --text-color: #111827;
   --text-color-1: #6b7280;
   --muted-color: #6b7280;
-  --card-bg: #ffffff;
-  --border-color: #e5e7eb;
-  --header-bg: #ffffff;
+  --card-bg: #e9e9e9;
+  --border-color: transparent;
+  --header-bg: #e9e9e9;
   --header-text: #111827;
   --border-color-light: rgba(225, 225, 225, 0.25);
   --red-candle: #ef4444;
@@ -40,17 +40,17 @@
 }
 
 .theme-dark {
-  --bg-color: #000000;
+  --bg-color: #141414;
   --text-color: #f3f4f6;
   --muted-color: #9ca3af;
-  --card-bg: #111111;
-  --border-color: #1f2937;
-  --header-bg: #000000;
+  --card-bg: #202020;
+  --border-color: transparent;
+  --header-bg: #141414;
   --header-text: #f3f4f6;
   --shadow-color: rgba(0, 0, 0, 0.35);
   --accent: #22c55e;
   --light-grey: #404040;
-  --border-color-light: rgba(100, 100, 100, 0.115);
+  --border-color-light: rgba(100, 100, 100, 0);
   --red-candle: #ef4444;
   --green-candle: #22c55e;
 }
@@ -77,7 +77,7 @@ button {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)) var(--bg-color);
+  /* background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)) var(--bg-color); */
 }
 
 .app-body {
@@ -91,7 +91,6 @@ button {
   flex-shrink: 0;
   height: var(--ticker-tape-h);
   overflow: hidden;
-  background: var(--card-bg);
   border-bottom: 1px solid var(--border-color);
   white-space: nowrap;
   position: relative;
@@ -172,7 +171,7 @@ button {
 }
 
 .card {
-  background: var(--card-bg);
+  background: var(--bg-color);
   border: 1px solid var(--border-color);
   border-radius: 0;
   padding: 18px 16px;
@@ -357,7 +356,8 @@ button {
 
 .live-toolbar {
   flex-shrink: 0;
-  padding: 10px 16px;
+  height: 50px;
+  padding: 0px 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -881,7 +881,7 @@ button {
   justify-content: space-between;
   gap: 12px;
   padding: 6px 12px;
-  background: var(--bg-color);
+  background: var(--card-bg);
   color: var(--muted-color);
   border-top: 1px solid var(--border-color);
   font-size: 11px;
@@ -965,6 +965,7 @@ button {
   padding: 8px 10px;
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
+  background-color: var(--card-bg);
 }
 
 .equity-drawer__title {
@@ -1039,6 +1040,7 @@ button {
   border-bottom: 1px solid var(--border-color);
   color: var(--text-color);
   gap: 10px;
+  background-color: var(--card-bg);
 }
 
 .log-drawer__title {
@@ -1058,7 +1060,7 @@ button {
   gap: 6px;
   padding: 4px 8px;
   border: none;
-  background: var(--light-grey);
+  background: var(--bg-color);
 }
 
 .log-drawer__search input {
@@ -1108,8 +1110,7 @@ button {
   width: 75vw;
   max-width: 1100px;
   min-width: 320px;
-  background: var(--bg-color);
-  border-left: 1px solid var(--border-color);
+  background: var(--card-bg);
   transform: translateX(100%);
   transition: transform 0.25s ease, opacity 0.2s ease;
   z-index: 6;
@@ -1117,7 +1118,7 @@ button {
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  padding-bottom: 19px;
+  padding-bottom: 0px;
 }
 
 .trades-drawer.is-open {
@@ -1155,7 +1156,7 @@ button {
   gap: 6px;
   padding: 4px 8px;
   border: none;
-  background: var(--light-grey);
+  background: var(--bg-color);
   font-family: inherit;
   font-size: 10px;
 }
@@ -1271,7 +1272,7 @@ button {
   gap: 12px;
   flex-wrap: wrap;
   box-shadow: 0 -1px 0 var(--border-color);
-  background: color-mix(in srgb, var(--card-bg) 95%);
+  background: var(--bg-color);
 }
 
 .trades-drawer__footer .metric-label {
@@ -1389,7 +1390,6 @@ button {
 .sidebar {
   flex-shrink: 0;
   width: 220px;
-  border-right: 1px solid var(--border-color);
   color: var(--text-color);
   display: flex;
   flex-direction: column;
@@ -1432,7 +1432,6 @@ button {
 .sidebar__item.is-active {
   color: var(--text-color);
   border-left-color: var(--accent);
-  background: var(--card-bg);
 }
 
 .sidebar__icon {
@@ -1572,7 +1571,7 @@ button {
 
 .settings-form-group-inline input {
   padding: 8px 10px;
-  background: var(--bg-color);
+  background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 4px;
   color: var(--text-color);
@@ -1926,13 +1925,14 @@ button {
 
 /* ── Left column ── */
 .ln__left {
-  width: 220px;
+  width: 200px;
   flex-shrink: 0;
   border-right: 1px solid var(--border-color);
-  overflow-y: auto;
+  overflow-y: scroll;
   padding: 0;
   display: flex;
   flex-direction: column;
+  height: calc(100vh - var(--ticker-tape-h, 28px) - var(--status-bar-h, 32px));
 }
 
 .ln__section {
@@ -2291,9 +2291,203 @@ button {
   border-color: var(--muted-color);
 }
 
+/* ══ Position Widget ══ */
+.pw__flat {
+  font-size: 13px;
+  color: var(--muted-color);
+  letter-spacing: 1px;
+}
+
+.pw__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.pw__side {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border: 1px solid;
+}
+
+.pw__side--buy {
+  color: var(--green-candle);
+  border-color: var(--green-candle);
+}
+
+.pw__side--sell {
+  color: var(--red-candle);
+  border-color: var(--red-candle);
+}
+
+.pw__elapsed {
+  font-size: 10px;
+  color: var(--muted-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.pw__kv {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 2px 0;
+  color: var(--text-color-1);
+}
+
+/* ══ Risk Gauge ══ */
+.rg__gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 4px 0;
+  position: relative;
+}
+
+.rg__svg {
+  width: 100px;
+  height: 55px;
+}
+
+.rg__value {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: -8px;
+}
+
+.rg__label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.rg__details {
+  margin-top: 6px;
+}
+
+/* ══ Strategy Controls ══ */
+.sc__param {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 11px;
+}
+
+.sc__param-label {
+  color: var(--text-color-1);
+}
+
+.sc__param-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sc__param-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 0;
+}
+
+.sc__param-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sc__param-value {
+  font-variant-numeric: tabular-nums;
+  min-width: 60px;
+  text-align: center;
+  font-size: 11px;
+}
+
+.sc__toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 11px;
+  color: var(--text-color-1);
+}
+
+.sc__toggle {
+  width: 32px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--border-color);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.sc__toggle.is-on {
+  background: var(--accent);
+}
+
+.sc__toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg-color);
+  transition: left 0.2s;
+}
+
+.sc__toggle.is-on .sc__toggle-knob {
+  left: 18px;
+}
+
+.sc__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sc__btn {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 10px;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-color);
+}
+
+.sc__btn--save {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sc__btn--save:hover {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.sc__btn--reset:hover {
+  border-color: var(--muted-color);
+}
+
 /* ══ Activity Panel (right column) ══ */
 .ap {
-  width: 360px;
+  width: 450px;
   flex-shrink: 0;
   border-left: 1px solid var(--border-color);
   display: flex;
@@ -2312,7 +2506,6 @@ button {
 
 .ap__section--news {
   flex: 0 0 25%;
-  border-bottom: 1px solid var(--border-color);
   overflow-y: auto;
   padding-bottom: 12px;
 }

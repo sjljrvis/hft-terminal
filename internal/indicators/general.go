@@ -37,6 +37,8 @@ func WMA(df *dataframe.DataFrame, seriesname string, source string, period int) 
 
 	wma := make([]float64, length)
 
+	// Warmup rows stay 0.0 (not NaN) because WMA feeds into CalcX → EMA chain,
+	// and Go's EMA propagates NaN forever (unlike Python's ewm which skips NaN).
 	for i := period - 1; i < length; i++ {
 		sum := 0.0
 		weightSum := 0.0
@@ -46,11 +48,8 @@ func WMA(df *dataframe.DataFrame, seriesname string, source string, period int) 
 			sum += _source.Values[i-j] * weight
 			weightSum += weight
 		}
-		// wma[i] = math.Round((sum/weightSum)*1000) / 1000
-		wma[i] = math.Ceil(sum / weightSum)
+		wma[i] = sum / weightSum
 	}
-
-	wma[0] = 0
 	_wma := dataframe.NewSeriesFloat64(seriesname, nil, wma)
 	df.AddSeries(_wma, nil)
 }
@@ -101,11 +100,14 @@ func StandardDeviation(df *dataframe.DataFrame, seriesname string, source string
 }
 
 func Slope(df *dataframe.DataFrame, seriesname string, source string, period int) {
-	// Python: series.diff(period) / period  — non-NaN from index `period` (not period+1)
+	// Python: series.diff(period) / period  — NaN for rows [0, period), valid from index `period`
 	length := df.NRows()
 	_source := df.Series[FindIndexOf(df, source)].(*dataframe.SeriesFloat64).Values
 	slope := make([]float64, length)
 
+	for i := 0; i < period; i++ {
+		slope[i] = math.NaN()
+	}
 	for i := period; i < length; i++ {
 		slope[i] = (_source[i] - _source[i-period]) / float64(period)
 	}
@@ -135,7 +137,7 @@ func LogReturn(df *dataframe.DataFrame, seriesname string, source string, shift 
 	logReturn := make([]float64, length)
 
 	for i := 0; i < shift; i++ {
-		logReturn[i] = 0
+		logReturn[i] = math.NaN()
 	}
 	for i := shift; i < length; i++ {
 		logReturn[i] = math.Log(_source[i] / _source[i-shift])
@@ -148,13 +150,10 @@ func CalculateRollingStd(logRet []float64, window int) []float64 {
 	n := len(logRet)
 	result := make([]float64, n)
 
-	for i := 0; i < n; i++ {
-
-		if i < window-1 {
-			result[i] = 0
-			continue
-		}
-
+	for i := 0; i < window-1; i++ {
+		result[i] = math.NaN()
+	}
+	for i := window - 1; i < n; i++ {
 		start := i - window + 1
 		sum := 0.0
 
@@ -205,13 +204,10 @@ func CalculateVolExpansion(rollingStd []float64, window int) []float64 {
 	n := len(rollingStd)
 	result := make([]float64, n)
 
-	for i := 0; i < n; i++ {
-
-		if i < window-1 {
-			result[i] = 0
-			continue
-		}
-
+	for i := 0; i < window-1; i++ {
+		result[i] = math.NaN()
+	}
+	for i := window - 1; i < n; i++ {
 		start := i - window + 1
 		sum := 0.0
 

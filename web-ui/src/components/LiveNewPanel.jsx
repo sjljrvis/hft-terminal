@@ -3,6 +3,9 @@ import axios from "axios";
 import ChartPanel from "./ChartPanel";
 import EquityCurve from "./EquityCurve";
 import ActivityPanel from "./ActivityPanel";
+import PositionWidget from "./PositionWidget";
+import RiskGauge from "./RiskGauge";
+import StrategyControls from "./StrategyControls";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import {
   fetchLiveTrades,
@@ -74,8 +77,6 @@ function LiveNewPanel() {
 
   const pnl = positionPnL ?? 0;
   const winRate = metrics.totalTrades > 0 ? metrics.winRate : 0;
-  const avgProfit =
-    metrics.totalTrades > 0 ? metrics.totalPnl / metrics.totalTrades : 0;
   const broker = status?.hft?.Broker;
 
   const formatPrice = (v) =>
@@ -118,25 +119,15 @@ function LiveNewPanel() {
               {formatPrice(metrics.totalPnl)}
             </span>
           </div>
+          <div className="ln__kv" style={{ marginTop: 4 }}>
+            <span>{metrics.totalTrades} trades</span>
+            <span>{winRate.toFixed(0)}% win</span>
+          </div>
         </section>
 
-        {broker && (
-          <section className="ln__section">
-            <div className="ln__section-label">Broker</div>
-            <div className="ln__kv">
-              <span>Margin</span>
-              <span>{formatPrice(broker.AvailableMargin)}</span>
-            </div>
-            <div className="ln__kv">
-              <span>Utilized</span>
-              <span>{formatPrice(broker.UtilizedMargin)}</span>
-            </div>
-            <div className="ln__kv">
-              <span>Equity</span>
-              <span>{formatPrice(broker.Equity)}</span>
-            </div>
-          </section>
-        )}
+        <PositionWidget />
+
+        {broker && <RiskGauge broker={broker} />}
 
         <section className="ln__section">
           <div className="ln__section-label">System</div>
@@ -152,80 +143,7 @@ function LiveNewPanel() {
           </div>
         </section>
 
-        <section className="ln__section">
-          <div className="ln__section-label">Performance</div>
-          <div className="ln__perf-grid">
-            <div className="ln__perf-ring">
-              <svg viewBox="0 0 36 36" className="ln__ring-svg">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border-color)" strokeWidth="2" />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.9"
-                  fill="none"
-                  stroke="var(--green-candle)"
-                  strokeWidth="2"
-                  strokeDasharray={`${winRate} ${100 - winRate}`}
-                  strokeDashoffset="25"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span className="ln__ring-label">{winRate.toFixed(0)}%</span>
-              <span className="ln__ring-sub">Win</span>
-            </div>
-            <div className="ln__perf-ring">
-              <svg viewBox="0 0 36 36" className="ln__ring-svg">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border-color)" strokeWidth="2" />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.9"
-                  fill="none"
-                  stroke={avgProfit >= 0 ? "var(--green-candle)" : "var(--red-candle)"}
-                  strokeWidth="2"
-                  strokeDasharray={`${Math.min(Math.abs(avgProfit) * 2, 100)} ${100 - Math.min(Math.abs(avgProfit) * 2, 100)}`}
-                  strokeDashoffset="25"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span className="ln__ring-label">
-                {avgProfit >= 0 ? "+" : ""}
-                {avgProfit.toFixed(1)}
-              </span>
-              <span className="ln__ring-sub">Avg</span>
-            </div>
-          </div>
-          <div className="ln__stat-row">
-            <div className="ln__stat">
-              <span className="ln__stat-val">{metrics.totalTrades}</span>
-              <span className="ln__stat-label">Trades</span>
-            </div>
-            <div className="ln__stat">
-              <span className="ln__stat-val">{formatPrice(metrics.maxDrawdown)}</span>
-              <span className="ln__stat-label">Max DD</span>
-            </div>
-          </div>
-          <div className="ln__stat-row">
-            <div className="ln__stat">
-              <span className="ln__stat-val">{metrics.profitFactor === Infinity ? "INF" : metrics.profitFactor?.toFixed(2)}</span>
-              <span className="ln__stat-label">Profit Factor</span>
-            </div>
-            <div className="ln__stat">
-              <span className="ln__stat-val">
-                {metrics.winCount}/{metrics.totalTrades}
-              </span>
-              <span className="ln__stat-label">W/L</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="ln__section">
-          <div className="ln__section-label">Exit Breakdown</div>
-          <ExitBar label="Target" count={metrics.profitTargetCount} total={metrics.totalTrades} color="var(--green-candle)" />
-          <ExitBar label="Trail" count={metrics.trailingStopCount} total={metrics.totalTrades} color="var(--accent)" />
-          <ExitBar label="SL" count={metrics.stopLossCount} total={metrics.totalTrades} color="var(--red-candle)" />
-          <ExitBar label="Signal" count={metrics.signalCount} total={metrics.totalTrades} color="var(--muted-color)" />
-        </section>
+        {/* <StrategyControls /> */}
       </aside>
 
       {/* ── CENTER COLUMN ── */}
@@ -329,26 +247,6 @@ function LiveNewPanel() {
 
       {/* ── RIGHT COLUMN ── */}
       <ActivityPanel />
-    </div>
-  );
-}
-
-function ExitBar({ label, count, total, color }) {
-  const pct = total > 0 ? (count / total) * 100 : 0;
-  return (
-    <div className="ln__exit-bar">
-      <div className="ln__exit-bar-label">
-        <span>{label}</span>
-        <span>
-          {count} <span className="ln__exit-bar-pct">({pct.toFixed(0)}%)</span>
-        </span>
-      </div>
-      <div className="ln__exit-bar-track">
-        <div
-          className="ln__exit-bar-fill"
-          style={{ width: `${pct}%`, background: color }}
-        />
-      </div>
     </div>
   );
 }

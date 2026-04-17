@@ -1,7 +1,7 @@
 {
   "model_type": "tcn",
-  "seq_len": 120,
-  "n_features": 32,
+  "seq_len": 60,
+  "n_features": 47,
   "feature_cols": [
     "fast_cci",
     "tr",
@@ -34,18 +34,33 @@
     "kalman_fast_dist",
     "kalman_slow_dist",
     "kalman_crossover",
-    "minute_of_day"
+    "minute_of_day",
+    "vol_sma_ratio",
+    "vol_roc",
+    "vol_price_corr",
+    "obv_slope",
+    "vwap_dist",
+    "dist_ema_fast_5m",
+    "dist_ema_slow_5m",
+    "ema_crossover_5m",
+    "rsi_5m",
+    "atr_pct_5m",
+    "dist_ema_fast_15m",
+    "dist_ema_slow_15m",
+    "ema_crossover_15m",
+    "rsi_15m",
+    "atr_pct_15m"
   ],
-  "checkpoint_path": "/Users/apple/Work/ML/timeseries/regime-model/saved_models/best_model_state_dict.pt",
+  "checkpoint_path": "/Users/apple/Work/ML/timeseries/regime-model/model_kairos/best_model_state_dict.pt",
   "config_path": "/Users/apple/Work/ML/timeseries/regime-model/configs/model.yaml",
   "opset": 17,
   "dynamic_batch": false,
   "dynamic_seq": false,
   "output": "logits (apply softmax to get probabilities)",
   "smoothing": {
-    "enabled": true,
-    "confirm_bars": 5,
-    "min_confidence": 0.55,
+    "enabled": false,
+    "confirm_bars": 2,
+    "min_confidence": 0.6,
     "forbid_volatile_after_nonvolatile": true,
     "start_state": "volatile"
   }

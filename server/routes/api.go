@@ -34,6 +34,7 @@ func APIHandler(mode string, dbPath string, wsHub *Hub) http.Handler {
 	mux.HandleFunc("/live/trades", LiveTradesHandler)
 	mux.HandleFunc("/live/position", LivePositionHandler)
 	mux.HandleFunc("/live/stats", LiveStatsHandler)
+	mux.HandleFunc("/live/config", LiveConfigHandler)
 
 	// Backtest endpoints
 	mux.HandleFunc("/backtest/run", BacktestRunHandler(dbPath))

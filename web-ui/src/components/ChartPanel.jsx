@@ -613,25 +613,26 @@ function ChartPanel({ apiEndpoint = "http://localhost:5001/ticks" }) {
       candleSeriesRef.current.setData(candleData);
     }
 
-    if (lineSeriesSlowRef.current) {
-      const lineData = ticks
-        .filter((t) => typeof t.slow_tempx === "number" && Number.isFinite(t.slow_tempx))
-        .map((t) => ({
-          time: t.timeIst ?? t.time,
-          value: t.slow_tempx,
-          color: swapColor(t.regime),
-        }));
-      if (lineData.length) {
-        lineSeriesSlowRef.current.setData(lineData);
-      }
-    }
+    // if (lineSeriesSlowRef.current) {
+    //   const lineData = ticks
+    //     .filter((t) => typeof t.slow_tempx === "number" && Number.isFinite(t.slow_tempx))
+    //     .map((t) => ({
+    //       time: t.timeIst ?? t.time,
+    //       value: t.slow_tempx,
+    //       color: swapColor(t.regime),
+    //     }));
+    //   if (lineData.length) {
+    //     lineSeriesSlowRef.current.setData(lineData);
+    //   }
+    // }
+    
     if (lineSeriesFastRef.current) {
       const lineDataBase = ticks
         .filter((t) => typeof t.fast_tempx === "number" && Number.isFinite(t.fast_tempx))
         .map((t) => ({
           time: t.timeIst ?? t.time,
           value: t.fast_tempx,
-          color: swapColor(t.swap),
+          color: "#ef4cfa",  // swapColor(t.swap),
         }));
       if (lineDataBase.length) {
         lineSeriesFastRef.current.setData(lineDataBase);

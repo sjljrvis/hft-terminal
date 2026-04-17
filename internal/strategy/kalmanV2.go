@@ -19,6 +19,9 @@ type KalmanExitConfigv2 struct {
 	FixedSL           float64
 }
 
+// ActiveExitConfig is the live-editable exit config. Strategy reads this on each tick.
+var ActiveExitConfig = DefaultKalmanExitConfigv2()
+
 // DefaultKalmanExitConfig returns the default exit parameters.
 func DefaultKalmanExitConfigv2() *KalmanExitConfigv2 {
 	return &KalmanExitConfigv2{
@@ -27,6 +30,21 @@ func DefaultKalmanExitConfigv2() *KalmanExitConfigv2 {
 		SignalConfirmBars: 0,
 		EnableFixedSL:     false,
 		FixedSL:           -50,
+	}
+}
+
+// ExitConfigToJSON returns the active exit config as a map.
+func ExitConfigToJSON() map[string]interface{} {
+	cfg := ActiveExitConfig
+	if cfg == nil {
+		cfg = DefaultKalmanExitConfigv2()
+	}
+	return map[string]interface{}{
+		"activationMFEPts":  cfg.ActivationMFEPts,
+		"mfeCaptureRatio":   cfg.MFECaptureRatio,
+		"signalConfirmBars": cfg.SignalConfirmBars,
+		"enableFixedSL":     cfg.EnableFixedSL,
+		"fixedSL":           cfg.FixedSL,
 	}
 }
 
@@ -440,8 +458,8 @@ func RunKalmanv2(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
 	// Trend indicators — reduced periods for faster trend detection
 	indicators.EMA(df, "ema_fast", "close", 5)
 	indicators.EMA(df, "ema_slow", "close", 21)
-	indicators.Slope(df, "ema_slope_fast", "ema_fast", 3)
-	indicators.Slope(df, "ema_slope_slow", "ema_slow", 5)
+	indicators.Slope(df, "ema_slope_fast", "ema_fast", 5)
+	indicators.Slope(df, "ema_slope_slow", "ema_slow", 10)
 	indicators.PriceDistance(df, "price_dist_ema_fast", "close", "ema_fast")
 	indicators.PriceDistance(df, "price_dist_ema_slow", "close", "ema_slow")
 	// Python: (ema_fast - ema_slow) / (ema_slow + 1e-10)
@@ -458,11 +476,19 @@ func RunKalmanv2(df *dataframe.DataFrame, logEvents chan *types.LogEvent) {
 	// Volatility indicators
 	indicators.ATRSmoothed(df, "atr_computed", 7)
 	indicators.RollingStd(df, "rolling_std", "log_ret", 21)
-	indicators.RollingStd(df, "rolling_std_60", "log_ret", 21)
+	indicators.RollingStd(df, "rolling_std_60", "log_ret", 60)
 	indicators.HLRangePct(df, "hl_range_pct")
-	indicators.VolExpansion(df, "vol_expansion", "rolling_std", 21)
+	indicators.VolExpansion(df, "vol_expansion", "rolling_std", 60)
 
 	indicators.AddMicrostructureFeatures(df)
 	indicators.AddMinuteOfDay(df)
+
+	// Volume features (zero columns for index data like Nifty)
+	indicators.AddVolumeFeatures(df)
+
+	// Multi-timeframe features (5m + 15m HT bars, shift(1), forward-filled)
+	indicators.AddMTFFeatures(df, 5)
+	indicators.AddMTFFeatures(df, 15)
+
 	fmt.Println("time taken to calculate indicators", time.Since(start))
 }

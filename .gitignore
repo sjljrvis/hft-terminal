@@ -4,3 +4,4 @@ hft.db
 .tmp
 
 .claude/worktrees
+export/

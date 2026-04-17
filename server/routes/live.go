@@ -6,6 +6,7 @@ import (
 
 	"hft/internal/brokers"
 	"hft/internal/executor"
+	"hft/internal/strategy"
 )
 
 func FyersMarginHandler(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +86,55 @@ func LiveTicksHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode ticks", http.StatusInternalServerError)
 		return
 	}
+}
+
+// LiveConfigHandler handles GET/POST for strategy exit config.
+func LiveConfigHandler(w http.ResponseWriter, r *http.Request) {
+	enableCORS(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodGet {
+		json.NewEncoder(w).Encode(strategy.ExitConfigToJSON())
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var body struct {
+			ActivationMFEPts  *float64 `json:"activationMFEPts"`
+			MFECaptureRatio   *float64 `json:"mfeCaptureRatio"`
+			SignalConfirmBars *int     `json:"signalConfirmBars"`
+			EnableFixedSL     *bool    `json:"enableFixedSL"`
+			FixedSL           *float64 `json:"fixedSL"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		cfg := strategy.ActiveExitConfig
+		if body.ActivationMFEPts != nil {
+			cfg.ActivationMFEPts = *body.ActivationMFEPts
+		}
+		if body.MFECaptureRatio != nil {
+			cfg.MFECaptureRatio = *body.MFECaptureRatio
+		}
+		if body.SignalConfirmBars != nil {
+			cfg.SignalConfirmBars = *body.SignalConfirmBars
+		}
+		if body.EnableFixedSL != nil {
+			cfg.EnableFixedSL = *body.EnableFixedSL
+		}
+		if body.FixedSL != nil {
+			cfg.FixedSL = *body.FixedSL
+		}
+		json.NewEncoder(w).Encode(strategy.ExitConfigToJSON())
+		return
+	}
+
+	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 }
 
 // LiveTradesHandler handles GET requests to return live trades.

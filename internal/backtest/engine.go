@@ -10,6 +10,7 @@ import (
 
 	"hft/internal/dataframe"
 	"hft/internal/indicators"
+	"hft/internal/ml_model"
 	"hft/internal/storage/sqlite"
 	"hft/internal/strategy"
 	"hft/pkg/types"
@@ -98,6 +99,8 @@ type BacktestStats struct {
 	StopLossExits     int
 	TrailingStopExits int
 	SignalExits       int
+	EODSquareoffExits int
+	BreakevenExits    int
 	ExpectancyRatio   float64
 }
 
@@ -182,10 +185,14 @@ func SubscribeSignals() {
 				stats.ProfitTargetExits++
 			case "STOP_LOSS":
 				stats.StopLossExits++
-			case "TRAILING_STOP":
+			case "TRAILING_STOP", "TRAILING_SL":
 				stats.TrailingStopExits++
 			case "SIGNAL":
 				stats.SignalExits++
+			case "EOD_SQUAREOFF":
+				stats.EODSquareoffExits++
+			case "BREAKEVEN":
+				stats.BreakevenExits++
 			}
 
 			// Calculate Expectancy Ratio
@@ -252,6 +259,8 @@ func printBacktestSummary() {
 	log.Printf("  Profit Target:   %d", stats.ProfitTargetExits)
 	log.Printf("  Stop Loss:       %d", stats.StopLossExits)
 	log.Printf("  Trailing Stop:   %d", stats.TrailingStopExits)
+	log.Printf("  Breakeven:       %d", stats.BreakevenExits)
+	log.Printf("  EOD Squareoff:   %d", stats.EODSquareoffExits)
 	log.Printf("  Signal:          %d", stats.SignalExits)
 	log.Println("=======================================")
 }
@@ -332,15 +341,18 @@ func RunWithDatesWarmup(startDate, endDate, warmupFromDate string) error {
 	// strategy.FindKalmanSignal(df, Instance.Position, Instance.Positions, Instance.Events)
 
 	strategy.RunKalmanv2(df, Instance.LogEvents)
-	strategy.FindKalmanSignalv2(df, Instance.Position, Instance.Positions, Instance.Events)
 
-	// start := time.Now()
-	// err = ml_model.PredictRegimeFromDFStrided(df, 10)
-	// if err != nil {
-	// 	log.Printf("backtest: predict regime: %v", err)
-	// 	return fmt.Errorf("failed to predict regime: %v", err)
-	// }
-	// log.Printf("backtest: predict regime: %v", time.Since(start))
+	// Run model predictions (adds pred_prob_* columns to df).
+	start := time.Now()
+	err = ml_model.PredictRegimeFromDFStrided(df, 1)
+	if err != nil {
+		log.Printf("backtest: predict regime: %v", err)
+		return fmt.Errorf("failed to predict regime: %v", err)
+	}
+	log.Printf("backtest: predict regime: %v", time.Since(start))
+
+	// Regime-model entry/exit signals (uses prediction columns).
+	strategy.FindRegimeSignal(df, Instance.Position, Instance.Positions, Instance.Events)
 
 	// Close events channel to trigger summary printouts
 	close(Instance.Events)
@@ -459,5 +471,107 @@ func DownloadData() {
 	ctx := context.Background()
 	file, _ := os.Create("export/predicted.csv")
 	exports.ExportToCSV(ctx, file, Instance.DF)
+}
 
+// DownloadMultiSymbolData loads each symbol separately, computes indicators
+// per symbol, and writes a combined CSV with symbol_id column.
+func DownloadMultiSymbolData(startDate, endDate string) {
+	ctx := context.Background()
+	db := sqlite.DefaultDB()
+	if db == nil {
+		log.Println("download: db not initialized")
+		return
+	}
+
+	symbols := []string{"nifty"} //, "reliance"}
+
+	file, err := os.Create("export/training_multi.csv")
+	if err != nil {
+		log.Printf("download: create file: %v", err)
+		return
+	}
+	defer file.Close()
+
+	headerWritten := false
+
+	for _, symbol := range symbols {
+		symbolID := dataframe.SYMBOL_MAP[symbol]
+		log.Printf("download: loading %s (symbol_id=%d)...", symbol, symbolID)
+
+		ticks, err := db.Ticks.ListTicksFiltered(ctx, symbol, "", 0, startDate, endDate)
+		if err != nil {
+			log.Printf("download: load %s ticks: %v", symbol, err)
+			continue
+		}
+		if len(ticks) == 0 {
+			log.Printf("download: %s has no ticks, skipping", symbol)
+			continue
+		}
+
+		// Create a fresh DataFrame for this symbol
+		df := dataframe.InitDataFrame()
+		dataframe.LoadHistoryBacktest(df, ticks)
+
+		// Compute indicators for this symbol in isolation
+		strategy.RunKalmanv2(df, nil)
+
+		log.Printf("download: %s — %d rows with indicators", symbol, df.NRows())
+
+		// Write CSV rows with symbol_id
+		writeDataFrameToCSV(file, df, symbolID, !headerWritten)
+		headerWritten = true
+	}
+
+	log.Printf("download: wrote export/training_multi.csv")
+}
+
+// writeDataFrameToCSV writes DataFrame rows to a CSV file, adding symbol_id column.
+func writeDataFrameToCSV(file *os.File, df *_df_.DataFrame, symbolID int, writeHeader bool) {
+	nRows := df.NRows()
+	nCols := len(df.Names())
+
+	// Collect column names (skip symbol_id from DataFrame, we add our own)
+	colNames := make([]string, 0, nCols)
+	colIndices := make([]int, 0, nCols)
+	for i := 0; i < nCols; i++ {
+		name := df.Series[i].Name()
+		if name == "symbol_id" {
+			continue
+		}
+		colNames = append(colNames, name)
+		colIndices = append(colIndices, i)
+	}
+
+	if writeHeader {
+		// Write header with symbol_id as first column after OHLCV+timestamp
+		header := ""
+		for i, name := range colNames {
+			if i > 0 {
+				header += ","
+			}
+			header += name
+		}
+		header += ",symbol_id\n"
+		file.WriteString(header)
+	}
+
+	// Write rows
+	for row := 0; row < nRows; row++ {
+		line := ""
+		for i, idx := range colIndices {
+			if i > 0 {
+				line += ","
+			}
+			val := df.Series[idx].Value(row)
+			if val == nil {
+				line += ""
+			} else if t, ok := val.(time.Time); ok {
+				line += t.Format("2006-01-02 15:04:05 -0700 MST")
+			} else {
+				line += fmt.Sprintf("%v", val)
+			}
+		}
+		line += fmt.Sprintf(",%d\n", symbolID)
+		file.WriteString(line)
+	}
 }

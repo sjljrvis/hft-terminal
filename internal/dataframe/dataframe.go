@@ -7,6 +7,11 @@ import (
 	"github.com/rocketlaunchr/dataframe-go"
 )
 
+var SYMBOL_MAP = map[string]int{
+	"nifty":    0,
+	"reliance": 1,
+}
+
 func InitDataFrame() *dataframe.DataFrame {
 	_o := dataframe.NewSeriesFloat64("open", nil)
 	_h := dataframe.NewSeriesFloat64("high", nil)
@@ -15,7 +20,8 @@ func InitDataFrame() *dataframe.DataFrame {
 	_timestamp := dataframe.NewSeriesTime("timestamp", nil)
 	_time := dataframe.NewSeriesTime("time", nil)
 	_volume := dataframe.NewSeriesFloat64("volume", nil)
-	_dataFrame := dataframe.NewDataFrame(_o, _h, _l, _c, _volume, _timestamp, _time)
+	_symbol_id := dataframe.NewSeriesInt64("symbol_id", nil)
+	_dataFrame := dataframe.NewDataFrame(_o, _h, _l, _c, _volume, _timestamp, _time, _symbol_id)
 	return _dataFrame
 }
 
@@ -77,6 +83,7 @@ func LoadHistoryBacktest(df *dataframe.DataFrame, data []types.Tick) {
 			"timestamp": tick.Timestamp,
 			"volume":    tick.Volume,
 			"time":      time.Unix(tick.Time, 0),
+			"symbol_id": SYMBOL_MAP[tick.Symbol],
 		})
 	}
 }
@@ -91,6 +98,7 @@ func LoadHistoryLive(df *dataframe.DataFrame, data []types.Tick) {
 			"timestamp": tick.Timestamp,
 			"volume":    tick.Volume,
 			"time":      time.Unix(tick.Time, 0),
+			"symbol_id": SYMBOL_MAP[tick.Symbol],
 		})
 	}
 }

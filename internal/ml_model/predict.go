@@ -35,7 +35,7 @@ const (
 
 	// numFeatures is the number of model input features per timestep.
 	// Must match the Features struct below and meta.n_features.
-	numFeatures = 32
+	numFeatures = 47
 )
 
 // ErrNotWarmedUp is returned when the circular buffer is not yet full.
@@ -139,11 +139,33 @@ type Features struct {
 	// ── Time context (32) ────────────────────────────────────────────────────
 	MinuteOfDay float64 `json:"minute_of_day"` // 32. minute_of_day  (0–1 over NSE session)
 
+	// ── Volume features (33-37) ──────────────────────────────────────────────
+	// All zero for index instruments (e.g. Nifty) where volume == 0.
+	VolSMARatio  float64 `json:"vol_sma_ratio"`  // 33. vol_sma_ratio
+	VolROC       float64 `json:"vol_roc"`        // 34. vol_roc
+	VolPriceCorr float64 `json:"vol_price_corr"` // 35. vol_price_corr
+	OBVSlope     float64 `json:"obv_slope"`      // 36. obv_slope
+	VWAPDist     float64 `json:"vwap_dist"`      // 37. vwap_dist
+
+	// ── Multi-timeframe 5m (38-42) ───────────────────────────────────────────
+	DistEMAFast5m  float64 `json:"dist_ema_fast_5m"` // 38. dist_ema_fast_5m
+	DistEMASlow5m  float64 `json:"dist_ema_slow_5m"` // 39. dist_ema_slow_5m
+	EMACrossover5m float64 `json:"ema_crossover_5m"` // 40. ema_crossover_5m
+	RSI5m          float64 `json:"rsi_5m"`           // 41. rsi_5m
+	ATRPct5m       float64 `json:"atr_pct_5m"`       // 42. atr_pct_5m
+
+	// ── Multi-timeframe 15m (43-47) ──────────────────────────────────────────
+	DistEMAFast15m  float64 `json:"dist_ema_fast_15m"` // 43. dist_ema_fast_15m
+	DistEMASlow15m  float64 `json:"dist_ema_slow_15m"` // 44. dist_ema_slow_15m
+	EMACrossover15m float64 `json:"ema_crossover_15m"` // 45. ema_crossover_15m
+	RSI15m          float64 `json:"rsi_15m"`           // 46. rsi_15m
+	ATRPct15m       float64 `json:"atr_pct_15m"`       // 47. atr_pct_15m
+
 	// ── Metadata — not fed to the model ─────────────────────────────────────
 	Timestamp time.Time
 }
 
-// toFloat32Row packs the 31 features into a fixed-size array in model order.
+// toFloat32Row packs the 47 features into a fixed-size array in model order.
 // NaN / Inf values are sanitised to 0.
 func (f Features) toFloat32Row() [numFeatures]float32 {
 	raw := [numFeatures]float64{
@@ -159,6 +181,9 @@ func (f Features) toFloat32Row() [numFeatures]float32 {
 		f.UpperWickRatio, f.LowerWickRatio, f.ConsecCandles, // 26-28
 		f.KalmanFastDist, f.KalmanSlowDist, f.KalmanCrossover, // 29-31
 		f.MinuteOfDay, // 32
+		f.VolSMARatio, f.VolROC, f.VolPriceCorr, f.OBVSlope, f.VWAPDist, // 33-37
+		f.DistEMAFast5m, f.DistEMASlow5m, f.EMACrossover5m, f.RSI5m, f.ATRPct5m, // 38-42
+		f.DistEMAFast15m, f.DistEMASlow15m, f.EMACrossover15m, f.RSI15m, f.ATRPct15m, // 43-47
 	}
 	var out [numFeatures]float32
 	for i, v := range raw {

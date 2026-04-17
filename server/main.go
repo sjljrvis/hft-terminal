@@ -75,7 +75,8 @@ func main() {
 
 	go func() {
 		backtest.Run()
-		backtest.DownloadData()
+		// // backtest.DownloadData()
+		backtest.DownloadMultiSymbolData("2015-01-01", "2026-03-12")
 	}()
 
 	// Start executor routine.
