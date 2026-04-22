@@ -975,6 +975,45 @@ button {
   font-weight: 300;
 }
 
+.equity-drawer__tabs {
+  display: flex;
+  gap: 0;
+}
+
+.equity-drawer__tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 4px 14px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted-color);
+  font-weight: 300;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.equity-drawer__tab:hover {
+  color: var(--text-color);
+}
+
+.equity-drawer__tab.is-active {
+  color: var(--text-color);
+  border-bottom-color: var(--accent);
+}
+
+
+.equity-drawer__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted-color);
+  font-size: 12px;
+}
+
 .equity-drawer__close {
   background: transparent;
   border: none;
@@ -995,6 +1034,11 @@ button {
   overflow: hidden;
   display: flex;
   flex-direction: row;
+}
+
+.equity-drawer__body.equity-drawer__body--trades {
+  flex-direction: column;
+  overflow: auto;
 }
 
 .equity-drawer__chart {

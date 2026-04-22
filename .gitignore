@@ -5,3 +5,5 @@ hft.db
 
 .claude/worktrees
 export/
+**/*.log
+**/*.pid

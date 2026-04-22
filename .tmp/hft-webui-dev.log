@@ -1,7 +1,13 @@
 $ vite --host "0.0.0.0" --port "5002"
 
-  VITE v5.4.21  ready in 472 ms
+  VITE v5.4.21  ready in 636 ms
 
   ➜  Local:   http://localhost:5002/
   ➜  Network: http://192.168.0.102:5002/
-1:19:40 AM [vite] hmr update /src/components/ChartPanel.jsx
+8:03:54 PM [vite] hmr update /src/components/EquityDrawer.jsx
+8:03:54 PM [vite] hmr update /src/components/EquityDrawer.jsx
+8:04:13 PM [vite] hmr update /src/style.css
+8:07:58 PM [vite] hmr update /src/components/EquityDrawer.jsx
+8:08:04 PM [vite] hmr update /src/style.css
+8:12:18 PM [vite] hmr update /src/style.css
+8:12:35 PM [vite] hmr update /src/style.css
