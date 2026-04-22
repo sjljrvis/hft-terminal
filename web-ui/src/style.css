@@ -1348,6 +1348,12 @@ button {
     opacity: 1;
 }
 
+.eq-trade-sr {
+  color: var(--muted-color);
+  font-size: 10px;
+  text-align: center;
+}
+
 .trades-table th.sortable {
   cursor: pointer;
   user-select: none;

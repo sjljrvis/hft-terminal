@@ -11,3 +11,6 @@ $ vite --host "0.0.0.0" --port "5002"
 8:08:04 PM [vite] hmr update /src/style.css
 8:12:18 PM [vite] hmr update /src/style.css
 8:12:35 PM [vite] hmr update /src/style.css
+8:19:45 PM [vite] hmr update /src/components/EquityDrawer.jsx
+8:20:07 PM [vite] hmr update /src/components/EquityDrawer.jsx
+8:20:29 PM [vite] hmr update /src/style.css

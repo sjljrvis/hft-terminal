@@ -26,6 +26,45 @@ function EquityDrawer() {
   );
 
   const [tab, setTab] = useState("equity");
+  const [sortField, setSortField] = useState("");
+  const [sortDir, setSortDir] = useState("asc");
+
+  const toggleSort = (field) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const sortIndicator = (field) => {
+    if (sortField !== field) return null;
+    return <span className="sort-indicator">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>;
+  };
+
+  const sortedTrades = useMemo(() => {
+    if (!trades || trades.length === 0) return [];
+    if (!sortField) return trades;
+    const sorted = [...trades].sort((a, b) => {
+      let va = a[sortField];
+      let vb = b[sortField];
+      if (sortField === "entryTime" || sortField === "exitTime") {
+        va = new Date(va).getTime() || 0;
+        vb = new Date(vb).getTime() || 0;
+      } else if (typeof va === "string") {
+        va = va.toLowerCase();
+        vb = (vb || "").toLowerCase();
+      } else {
+        va = Number(va) || 0;
+        vb = Number(vb) || 0;
+      }
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [trades, sortField, sortDir]);
 
   const stats = useMemo(() => {
     if (!trades || trades.length === 0) return null;
@@ -270,23 +309,25 @@ function EquityDrawer() {
               <table className="trades-table">
                 <thead>
                   <tr>
-                    <th>Entry</th>
-                    <th>Exit</th>
-                    <th>Type</th>
-                    <th>Entry Price</th>
-                    <th>Exit Price</th>
-                    <th>P&L</th>
-                    <th>Peak Profit</th>
-                    <th>Peak Loss</th>
+                    <th>#</th>
+                    <th className="sortable" role="button" onClick={() => toggleSort("entryTime")}>Entry {sortIndicator("entryTime")}</th>
+                    <th className="sortable" role="button" onClick={() => toggleSort("exitTime")}>Exit {sortIndicator("exitTime")}</th>
+                    <th className="sortable" role="button" onClick={() => toggleSort("type")}>Type {sortIndicator("type")}</th>
+                    <th className="sortable" role="button" onClick={() => toggleSort("entryPrice")}>Entry Price {sortIndicator("entryPrice")}</th>
+                    <th className="sortable" role="button" onClick={() => toggleSort("exitPrice")}>Exit Price {sortIndicator("exitPrice")}</th>
+                    <th className="sortable" role="button" onClick={() => toggleSort("profit")}>P&L {sortIndicator("profit")}</th>
+                    <th className="sortable" role="button" onClick={() => toggleSort("peakProfit")}>Peak Profit {sortIndicator("peakProfit")}</th>
+                    <th className="sortable" role="button" onClick={() => toggleSort("peakLoss")}>Peak Loss {sortIndicator("peakLoss")}</th>
                     <th>Reason</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {trades.map((trade, idx) => {
+                  {sortedTrades.map((trade, idx) => {
                     const profit = trade?.profit ?? 0;
                     const profitClass = profit > 0 ? "profit-positive" : profit < 0 ? "profit-negative" : "";
                     return (
-                      <tr key={idx}>
+                      <tr key={idx} className="trade-entry-row">
+                        <td className="eq-trade-sr">{idx + 1}</td>
                         <td className="trade-entry-crosshair-container">
                           <Crosshair size={14} weight="regular" aria-hidden="true" className="trade-entry-crosshair"
                             onClick={() => {
