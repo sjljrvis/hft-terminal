@@ -712,6 +712,82 @@ func (p *Predictor) predictRegimeFromDF(df *dataframe.DataFrame, stride int) err
 	return nil
 }
 
+// ─── Single-row DF inference (for simulation) ────────────────────────────────
+
+// TickPrediction holds the result of a single-row prediction.
+type TickPrediction struct {
+	Regime   Regime
+	ProbBull float64
+	ProbBear float64
+	ProbVol  float64
+}
+
+// PredictSingleRow runs inference for a single row in the DF, using the
+// seqLen-row window ending at rowIdx. Feature columns are read from cols
+// (pre-extracted, one slice per feature in featureCols order).
+// Returns an empty prediction if the window contains invalid features.
+func (p *Predictor) PredictSingleRow(cols [][]float64, rowIdx int) (TickPrediction, error) {
+	if p == nil || p.session == nil {
+		return TickPrediction{}, fmt.Errorf("predictor not initialised")
+	}
+	if rowIdx < p.seqLen-1 {
+		return TickPrediction{}, ErrNotWarmedUp
+	}
+
+	startRow := rowIdx - p.seqLen + 1
+
+	// Validate all features in the window are finite.
+	for s := startRow; s <= rowIdx; s++ {
+		for fi := 0; fi < p.nFeatures; fi++ {
+			v := cols[fi][s]
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				return TickPrediction{}, fmt.Errorf("row %d feature %d invalid", s, fi)
+			}
+		}
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Pack seqLen rows into input tensor (oldest first, scaled).
+	inData := p.inputTensor.GetData()
+	for s := 0; s < p.seqLen; s++ {
+		src := startRow + s
+		base := s * p.nFeatures
+		for fi := 0; fi < p.nFeatures; fi++ {
+			v := float32(cols[fi][src])
+			sv := (v - p.scalerCenter[fi]) / p.scalerScale[fi]
+			if math.IsNaN(float64(sv)) || math.IsInf(float64(sv), 0) {
+				sv = 0
+			}
+			inData[base+fi] = sv
+		}
+	}
+
+	if err := p.session.Run(); err != nil {
+		return TickPrediction{}, fmt.Errorf("inference: %w", err)
+	}
+
+	logits := p.outputTensor.GetData()
+	probs := softmax3(logits)
+	idx := argmaxIdx3(logits)
+
+	return TickPrediction{
+		Regime:   regimes[idx],
+		ProbBull: float64(probs[0]),
+		ProbBear: float64(probs[1]),
+		ProbVol:  float64(probs[2]),
+	}, nil
+}
+
+// FeatureCols returns the ordered feature column names the model expects.
+func (p *Predictor) FeatureCols() []string {
+	if p == nil {
+		return nil
+	}
+	return p.featureCols
+}
+
 // ─── Close ───────────────────────────────────────────────────────────────────
 
 // Close destroys the session and its tensors, then shuts down the ORT env.

@@ -9,9 +9,9 @@ function EquityCurve({ trades, height = 120 }) {
     if (!containerRef.current || !trades || trades.length === 0) return;
 
     const isDark = document.body.classList.contains("theme-dark");
-    const bg = isDark ? "#000000" : "#ffffff";
+    const bg = isDark ? "#141414" : "#f7f7f7";
     const textColor = isDark ? "#9ca3af" : "#6b7280";
-    const gridColor = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
+    const gridColor = isDark ? "#141414" : "#f7f7f7";
 
     const chart = createChart(containerRef.current, {
       height,

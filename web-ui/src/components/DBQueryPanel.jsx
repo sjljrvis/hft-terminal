@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { MagnifyingGlass } from "phosphor-react";
 
+const QUICK_QUERIES = [
+  { label: "Count Ticks", sql: "select count(*) from ticks;" },
+  { label: "Tokens", sql: "select * from tokens;" },
+  { label: "Delete Tokens", sql: "delete from tokens;" },
+];
+
 function DBQueryPanel() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -77,6 +83,18 @@ function DBQueryPanel() {
       </h3>
       
       <div style={{ flexShrink: 0, marginBottom: "16px" }}>
+        <div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
+          {QUICK_QUERIES.map((q) => (
+            <button
+              key={q.label}
+              type="button"
+              onClick={() => { setQuery(q.sql); }}
+              className="quick-query-btn"
+            >
+              {q.label}
+            </button>
+          ))}
+        </div>
         <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
           <div style={{ flex: 1, position: "relative" }}>
             <MagnifyingGlass 

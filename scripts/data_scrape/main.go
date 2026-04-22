@@ -22,7 +22,7 @@ var SECURITY_LIST = map[string]string{
 	"reliance": "738561",
 }
 
-const AUTH_TOKEN = "TxmUgkXTV4qD5bk0ZHOrvcUR4/6nqGKJAkf4dpFqmrRxJ+DDooWdLfNghceoOM3NrqzEr4O3SG5KdAWp3NREnsbCPVGIVeyVD9y+VQvAjKqnfm4akkcRFQ=="
+const AUTH_TOKEN = "GXIP+FvwzM1w43gy6WWsEqrNqJA6NuIx/5bbAcb6dXPA4wRz4VAOTDgAeYQBmSjEgv4k2lnzDehYA+gpBoCZBPvM7Y/KnqYSAg2yDylV2emOjt8D6Wb9Qg=="
 
 type ApiResponse struct {
 	Status string `json:"status"`
@@ -158,7 +158,7 @@ func main() {
 
 	var wg sync.WaitGroup
 	startDate := "2015-01-01"
-	endDate := "2026-03-12"
+	endDate := "2026-04-19"
 	dg := printGroupedDates(startDate, endDate)
 
 	// Limit concurrent requests

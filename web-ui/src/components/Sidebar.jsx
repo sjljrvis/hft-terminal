@@ -29,7 +29,7 @@ function Sidebar({ collapsed }) {
               }
             >
               <span className="sidebar__icon" aria-hidden="true">
-                <item.icon size={16} weight="regular" />
+                <item.icon size={14} weight="regular" />
               </span>
               <span className="sidebar__label">{item.label}</span>
             </NavLink>

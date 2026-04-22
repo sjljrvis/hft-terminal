@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"hft/internal/backtest"
 	"hft/internal/brokers"
 	"hft/internal/clock"
 	"hft/internal/config"
@@ -74,9 +73,9 @@ func main() {
 	log.Println("WebSocket event broadcaster started")
 
 	go func() {
-		backtest.Run()
+		// backtest.Run()
 		// // backtest.DownloadData()
-		backtest.DownloadMultiSymbolData("2015-01-01", "2026-03-12")
+		// backtest.DownloadMultiSymbolData("2015-01-01", "2026-03-12")
 	}()
 
 	// Start executor routine.

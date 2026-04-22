@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
-import { selectTheme, setTheme } from "../store/slices/uiSlice";
+import { selectTheme, setTheme, selectTickerTapeVisible, setTickerTapeVisible } from "../store/slices/uiSlice";
 
 function SettingsPanel() {
   const dispatch = useAppDispatch();
   const theme = useAppSelector(selectTheme);
-  
+  const tickerTapeVisible = useAppSelector(selectTickerTapeVisible);
+
   const [brokerStatus, setBrokerStatus] = useState(null);
   const [connecting, setConnecting] = useState(false);
   const [brokerError, setBrokerError] = useState("");
-  
+
   const [brokerConfig, setBrokerConfig] = useState({
     name: "",
     apiKey: "",
@@ -93,7 +94,7 @@ function SettingsPanel() {
             </div>
             <div className="settings-form-controls">
               {!isConnected ? (
-                <form 
+                <form
                   className="settings-broker-form"
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -193,7 +194,7 @@ function SettingsPanel() {
         <div className="settings-form-section">
           <div className="settings-form-row">
             <div className="settings-form-label">
-              <span>Theme Settings</span>
+              <span>Display Settings</span>
             </div>
             <div className="settings-form-controls">
               <div className="settings-radio-group">
@@ -216,6 +217,17 @@ function SettingsPanel() {
                     onChange={() => dispatch(setTheme("light"))}
                   />
                   <span>Light</span>
+                </label>
+              </div>
+              <div className="settings-toggle-item" style={{ marginTop: 16 }}>
+                <span className="settings-toggle-label">Ticker Tape</span>
+                <label className="settings-toggle settings-toggle--sm">
+                  <input
+                    type="checkbox"
+                    checked={tickerTapeVisible}
+                    onChange={(e) => dispatch(setTickerTapeVisible(e.target.checked))}
+                  />
+                  <span className="settings-toggle-slider" />
                 </label>
               </div>
             </div>

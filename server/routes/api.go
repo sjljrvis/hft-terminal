@@ -42,6 +42,9 @@ func APIHandler(mode string, dbPath string, wsHub *Hub) http.Handler {
 	mux.HandleFunc("/backtest/ticks", BacktestTicksHandler(dbPath))
 	mux.HandleFunc("/backtest/data", BacktestDataHandler)
 
+	// Simulation endpoint
+	mux.HandleFunc("/simulate", SimulateHandler(wsHub))
+
 	return mux
 }
 

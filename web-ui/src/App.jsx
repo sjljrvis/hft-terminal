@@ -29,6 +29,7 @@ import {
   toggleEquityDrawer,
   closeLogsDrawer,
   setActivePanel,
+  selectTickerTapeVisible,
 } from "./store/slices/uiSlice";
 
 function AppContent() {
@@ -40,6 +41,7 @@ function AppContent() {
   const sidebarCollapsed = useAppSelector(selectSidebarCollapsed);
   const logsOpen = useAppSelector(selectLogsDrawerOpen);
   const equityOpen = useAppSelector(selectEquityDrawerOpen);
+  const tickerTapeVisible = useAppSelector(selectTickerTapeVisible);
 
   // Set active panel based on route
   useEffect(() => {
@@ -61,7 +63,7 @@ function AppContent() {
 
   return (
     <div className="app-shell">
-      <TickerTape />
+      {tickerTapeVisible && <TickerTape />}
       {/* <Header theme={theme} onThemeChange={(newTheme) => dispatch(setTheme(newTheme))} />s */}
       <div className="app-body">
         <Sidebar collapsed={sidebarCollapsed} />

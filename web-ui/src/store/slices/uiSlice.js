@@ -8,6 +8,7 @@ const initialState = {
   logsDrawerOpen: false,
   logSize: 'min', // "min" | "max"
   activePanel: 'live', // "live" | "backtest"
+  tickerTapeVisible: false,
 };
 
 const uiSlice = createSlice({
@@ -51,6 +52,12 @@ const uiSlice = createSlice({
     setActivePanel: (state, action) => {
       state.activePanel = action.payload;
     },
+    setTickerTapeVisible: (state, action) => {
+      state.tickerTapeVisible = action.payload;
+    },
+    toggleTickerTape: (state) => {
+      state.tickerTapeVisible = !state.tickerTapeVisible;
+    },
   },
 });
 
@@ -67,6 +74,8 @@ export const {
   toggleLogSize,
   closeLogsDrawer,
   setActivePanel,
+  setTickerTapeVisible,
+  toggleTickerTape,
 } = uiSlice.actions;
 
 // Selectors
@@ -77,5 +86,6 @@ export const selectEquityDrawerOpen = (state) => state.ui.equityDrawerOpen;
 export const selectLogsDrawerOpen = (state) => state.ui.logsDrawerOpen;
 export const selectLogSize = (state) => state.ui.logSize;
 export const selectActivePanel = (state) => state.ui.activePanel;
+export const selectTickerTapeVisible = (state) => state.ui.tickerTapeVisible;
 
 export default uiSlice.reducer;
